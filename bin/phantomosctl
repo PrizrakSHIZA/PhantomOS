@@ -479,6 +479,50 @@ def open_power_menu() -> None:
         launch(actions[selected])
 
 
+def copy_screenshot(args: list[str], description: str) -> None:
+    if not shutil.which("grim") or not shutil.which("wl-copy"):
+        raise RuntimeError("Для снимков нужны grim и wl-clipboard; повторите установку PhantomOS.")
+    try:
+        image = subprocess.run(["grim", *args, "-"], check=True, capture_output=True).stdout
+        subprocess.run(["wl-copy", "--type", "image/png"], input=image, check=True, capture_output=True)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Не найдена команда: {error.filename}") from error
+    except subprocess.CalledProcessError as error:
+        details = error.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(details or f"Не удалось сделать снимок: {description}") from error
+    notify(f"Снимок {description} скопирован в буфер обмена")
+
+
+def screenshot_screen() -> None:
+    copy_screenshot([], "экрана")
+
+
+def screenshot_region() -> None:
+    try:
+        selection = subprocess.run(["slurp"], check=True, text=True, capture_output=True).stdout.strip()
+    except FileNotFoundError as error:
+        raise RuntimeError("Не найдена команда slurp") from error
+    except subprocess.CalledProcessError:
+        return
+    if selection:
+        copy_screenshot(["-g", selection], "выделенной области")
+
+
+def screenshot_window() -> None:
+    try:
+        active = json.loads(run_checked(["hyprctl", "-j", "activewindow"]).stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Hyprland вернул некорректные данные об активном окне") from error
+    position, size = active.get("at"), active.get("size")
+    if not isinstance(position, list) or not isinstance(size, list) or len(position) < 2 or len(size) < 2:
+        raise RuntimeError("Не удалось определить геометрию активного окна")
+    x, y = int(position[0]), int(position[1])
+    width, height = int(size[0]), int(size[1])
+    if width <= 0 or height <= 0:
+        raise RuntimeError("У активного окна нет области для снимка")
+    copy_screenshot(["-g", f"{x},{y} {width}x{height}"], "активного окна")
+
+
 def focus_window(address: str) -> None:
     if not address.startswith("0x") or any(char not in "0123456789abcdefABCDEFx" for char in address):
         raise RuntimeError("Неверный адрес окна.")
@@ -507,7 +551,7 @@ def print_mode_indicator(compact: bool = False) -> None:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: phantomosctl {menu|settings|power|toggle|mode-indicator|refresh-panels|apply-wallpaper|focus-window ADDRESS}")
+        print("Usage: phantomosctl {menu|settings|power|toggle|mode-indicator|refresh-panels|apply-wallpaper|screenshot-screen|screenshot-window|screenshot-region|focus-window ADDRESS}")
         return 2
 
     action = sys.argv[1]
@@ -528,6 +572,12 @@ def main() -> int:
             apply_saved_wallpaper(wait_for_service="--wait" in sys.argv[2:])
         elif action == "wallpaper":
             choose_wallpaper()
+        elif action == "screenshot-screen":
+            screenshot_screen()
+        elif action == "screenshot-window":
+            screenshot_window()
+        elif action == "screenshot-region":
+            screenshot_region()
         elif action == "focus-window" and len(sys.argv) == 3:
             focus_window(sys.argv[2])
         elif action == "show-mode":

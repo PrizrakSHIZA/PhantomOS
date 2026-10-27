@@ -1,0 +1,11 @@
+[SddmGreeterTheme]
+Name=PhantomOS
+Description=PhantomOS login screen in a Tokyo Night inspired palette
+Author=PhantomOS
+Copyright=2026 PhantomOS
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=phantomos
+Theme-API=2.0

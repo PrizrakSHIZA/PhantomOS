@@ -6,11 +6,12 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, Gtk
+from gi.repository import Gdk, GLib, Gtk
 
 HOME = Path.home()
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
@@ -126,7 +127,7 @@ class SettingsWindow(Gtk.Window):
         brand = Gtk.Label(); brand.set_markup('<span size="18000" weight="bold">◈ PhantomOS</span>\n<span alpha="75%">Настройки системы</span>'); brand.set_xalign(0); brand.set_margin_bottom(20)
         nav.pack_start(brand, False, False, 0)
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.SLIDE_LEFT_RIGHT, transition_duration=180)
-        pages = [("overview", "⌂   Обзор", self.overview_page), ("appearance", "◐   Внешний вид", self.appearance_page), ("display", "▣   Дисплеи", self.display_page), ("sound", "♫   Звук", self.sound_page), ("input", "⌨   Устройства ввода", self.input_page), ("network", "⌁   Сеть и Bluetooth", self.network_page), ("system", "⚙   Система", self.system_page), ("shortcuts", "⌘   Сочетания клавиш", self.shortcuts_page)]
+        pages = [("overview", "⌂   Обзор", self.overview_page), ("appearance", "◐   Внешний вид", self.appearance_page), ("display", "▣   Дисплеи", self.display_page), ("sound", "♫   Звук", self.sound_page), ("input", "⌨   Устройства ввода", self.input_page), ("network", "⌁   Сеть и Bluetooth", self.network_page), ("account", "♙   Вход и безопасность", self.account_page), ("system", "⚙   Система", self.system_page), ("shortcuts", "⌘   Сочетания клавиш", self.shortcuts_page)]
         for name, label, builder in pages:
             button = Gtk.Button(label=label); button.set_relief(Gtk.ReliefStyle.NONE); button.set_halign(Gtk.Align.FILL)
             button.connect("clicked", lambda _b, page=name: self.stack.set_visible_child_name(page))
@@ -298,8 +299,9 @@ class SettingsWindow(Gtk.Window):
             ("cycle_window", "Переключить активное окно", "ALT+TAB"),
             ("fullscreen", "Полноэкранный режим", "SUPER+F"),
             ("power", "Меню питания", "SUPER+SHIFT+E"),
-            ("screenshot_region", "Снимок области экрана", "PRINT"),
-            ("screenshot_screen", "Снимок всего экрана", "SUPER+PRINT"),
+            ("screenshot_screen", "Снимок всего экрана → буфер обмена", "PRINT"),
+            ("screenshot_window", "Снимок активного окна → буфер обмена", "ALT+PRINT"),
+            ("screenshot_region", "Выделить область → буфер обмена", "SUPER+SHIFT+S"),
         ]
         for index in range(1, 6):
             actions.append((f"workspace_{index}", f"Перейти на рабочий стол {index}", f"SUPER+{index}"))
@@ -412,6 +414,103 @@ class SettingsWindow(Gtk.Window):
         self.card(box, "Расширенные настройки GTK", "Внешний вид приложений GTK.", "Открыть", lambda: launch(["nwg-look"]))
         self.card(box, "Расширенные настройки Qt", "Внешний вид приложений Qt.", "Открыть", lambda: launch(["qt6ct"]))
         return box
+
+    def account_page(self) -> Gtk.Widget:
+        box = self.page("Вход и безопасность", "Пароль учётной записи и параметры входа в систему")
+        import getpass
+        self.card(box, "Пароль пользователя", f"Изменить пароль учётной записи {getpass.getuser()}. Ввод защищён штатной системной командой passwd и не сохраняется PhantomOS.", "Сменить пароль", self.change_password)
+        manager = self.display_manager()
+        if manager and manager != "sddm":
+            description = f"Обнаружен дисплейный менеджер: {manager}. Он отвечает за экран входа."
+            tail = f"Переключатель SDDM отключён, чтобы не менять настройки {manager}."
+        else:
+            description = "SDDM — экран входа PhantomOS; автологин запускает Hyprland автоматически."
+            tail = "Автологин выключен по умолчанию. Изменение потребует подтверждения администратора и вступит в силу при следующем входе."
+        self.card(box, "Экран приветствия", f"{description} Экран входа оформлен в теме PhantomOS.")
+
+        frame = Gtk.Frame(label="Автоматический вход")
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        inner.set_margin_top(12); inner.set_margin_bottom(12); inner.set_margin_start(14); inner.set_margin_end(14)
+        frame.add(inner); box.pack_start(frame, False, False, 0)
+        enabled = Path("/etc/sddm.conf.d/90-phantomos-autologin.conf").exists()
+        self.autologin_enabled = enabled
+        self.autologin_switch = Gtk.Switch(); self.autologin_switch.set_active(enabled)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        row.pack_start(Gtk.Label(label="Входить автоматически в учётную запись PhantomOS", xalign=0), True, True, 0)
+        row.pack_end(self.autologin_switch, False, False, 0)
+        if manager and manager != "sddm":
+            self.autologin_switch.set_sensitive(False)
+        inner.pack_start(row, False, False, 0)
+        status = Gtk.Label(label=tail, xalign=0, wrap=True); status.get_style_context().add_class("dim-label")
+        inner.pack_start(status, False, False, 0)
+        apply_button = Gtk.Button(label="Применить")
+        apply_button.set_halign(Gtk.Align.END)
+        if manager and manager != "sddm":
+            apply_button.set_sensitive(False)
+        apply_button.connect("clicked", lambda _button: self.apply_autologin(self.autologin_switch, apply_button, status))
+        inner.pack_start(apply_button, False, False, 0)
+        return box
+
+    @staticmethod
+    def display_manager() -> str | None:
+        link = Path("/etc/systemd/system/display-manager.service")
+        try:
+            resolved = link.resolve(strict=True).name
+            return resolved.removesuffix(".service")
+        except OSError:
+            pass
+        try:
+            result = subprocess.run(["systemctl", "show", "display-manager", "--property=FragmentPath", "--value"], check=True, capture_output=True, text=True, timeout=3)
+            return Path(result.stdout.strip()).name.removesuffix(".service") or None
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    @staticmethod
+    def change_password() -> None:
+        terminal = shutil.which("kitty")
+        if terminal:
+            subprocess.Popen([terminal, "--title", "PhantomOS · Смена пароля", "sh", "-lc", "passwd; printf '\\nНажмите Enter, чтобы закрыть окно…'; read -r _"], start_new_session=True)
+        else:
+            launch(["xterm", "-e", "passwd"])
+
+    def apply_autologin(self, switch: Gtk.Switch, button: Gtk.Button, status: Gtk.Label) -> None:
+        enabled = switch.get_active()
+        action = "enable" if enabled else "disable"
+        prompt = "При включённом автологине пользователь войдёт без ввода пароля при запуске компьютера. Продолжить?" if enabled else "Выключить автоматический вход для PhantomOS?"
+        dialog = Gtk.MessageDialog(transient_for=self, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.WARNING if enabled else Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.CANCEL, text=prompt)
+        dialog.add_button("Применить", Gtk.ResponseType.OK)
+        response = dialog.run(); dialog.destroy()
+        if response != Gtk.ResponseType.OK:
+            switch.set_active(self.autologin_enabled)
+            return
+
+        helper = "/usr/lib/phantomos/phantomos-sddm-autologin"
+        if not Path(helper).is_file() or not shutil.which("pkexec"):
+            switch.set_active(self.autologin_enabled)
+            status.set_text("Настройщик SDDM не установлен. Запустите установщик PhantomOS с установкой пакетов.")
+            return
+
+        button.set_sensitive(False); switch.set_sensitive(False)
+        status.set_text("Ожидание подтверждения администратора…")
+        def worker() -> None:
+            try:
+                result = subprocess.run(["pkexec", helper, action], capture_output=True, text=True, timeout=120)
+                detail = (result.stderr or result.stdout).strip()
+                GLib.idle_add(self.finish_autologin, switch, button, status, enabled, result.returncode, detail)
+            except (OSError, subprocess.SubprocessError) as error:
+                GLib.idle_add(self.finish_autologin, switch, button, status, enabled, 1, str(error))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def finish_autologin(self, switch: Gtk.Switch, button: Gtk.Button, status: Gtk.Label, enabled: bool, code: int, detail: str) -> bool:
+        button.set_sensitive(True); switch.set_sensitive(True)
+        if code == 0:
+            self.autologin_enabled = enabled
+            switch.set_active(enabled)
+            status.set_text("Автологин включён; SDDM запустит Hyprland при следующем входе." if enabled else "Автологин PhantomOS выключен.")
+        else:
+            switch.set_active(self.autologin_enabled)
+            status.set_text(f"Настройка не применена: {detail or 'операция отменена или завершилась ошибкой.'}")
+        return GLib.SOURCE_REMOVE
 
 
 if __name__ == "__main__":

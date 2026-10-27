@@ -2,6 +2,8 @@ post_install() {
     cat <<'EOF'
 PhantomOS files are installed. Run `phantom setup` as your regular user to
 install the Hyprland configuration and create user-level launchers.
+Enable the graphical login with `sudo systemctl enable sddm.service` if no
+other display manager is already enabled.
 Update the AUR package with `yay -Syu phantomos-git`.
 EOF
 }

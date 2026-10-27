@@ -40,7 +40,7 @@ if ((NO_PACKAGES == 0)); then
     command -v sudo >/dev/null 2>&1 || { echo 'Install sudo, then rerun ./install.sh.' >&2; exit 1; }
 
     packages=(
-        hyprland waybar rofi-wayland kitty micro python code gtk3 python-gobject git btop audacious haruna xdg-utils
+        hyprland waybar rofi-wayland kitty micro python code gtk3 python-gobject git btop audacious haruna xdg-utils sddm
         hyprpaper hyprlock swaync polkit-gnome pavucontrol easyeffects lsp-plugins-lv2
         nwg-displays nwg-look qt6ct kvantum zenity adw-gtk-theme pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber
         networkmanager network-manager-applet bluez bluez-utils blueman nemo gvfs gvfs-mtp tumbler ffmpegthumbnailer file-roller
@@ -49,9 +49,19 @@ if ((NO_PACKAGES == 0)); then
         papirus-icon-theme ttf-jetbrains-mono-nerd ttf-font-awesome
         noto-fonts noto-fonts-emoji
     )
-    printf 'Installing packages. NVIDIA drivers and system boot settings are left untouched.\n'
+    printf 'Installing packages. NVIDIA drivers and bootloader settings are left untouched.\n'
     sudo pacman -S --needed "${packages[@]}"
+    sudo install -D -o root -g root -m 0755 "$ROOT_DIR/bin/phantomos-sddm-autologin" /usr/lib/phantomos/phantomos-sddm-autologin
+    sudo install -D -o root -g root -m 0644 "$ROOT_DIR/assets/sddm/phantomos/Main.qml" /usr/share/sddm/themes/phantomos/Main.qml
+    sudo install -D -o root -g root -m 0644 "$ROOT_DIR/assets/sddm/phantomos/metadata.desktop" /usr/share/sddm/themes/phantomos/metadata.desktop
+    sudo install -D -o root -g root -m 0644 "$ROOT_DIR/assets/sddm/phantomos/theme.conf" /usr/share/sddm/themes/phantomos/theme.conf
+    sudo install -D -o root -g root -m 0644 "$ROOT_DIR/assets/sddm/90-phantomos-theme.conf" /etc/sddm.conf.d/90-phantomos-theme.conf
     if command -v systemctl >/dev/null 2>&1; then
+        if ! systemctl is-enabled --quiet display-manager.service; then
+            sudo systemctl enable sddm.service
+        else
+            printf 'An existing display manager is already enabled; leaving it unchanged. SDDM is installed but not selected as the login manager.\n'
+        fi
         if ! systemctl is-active --quiet bluetooth.service; then
             sudo systemctl enable --now bluetooth.service
         fi

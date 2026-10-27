@@ -46,6 +46,7 @@ depends=(
   'qt6ct'
   'rofi-wayland'
   'slurp'
+  'sddm'
   'grim'
   'swaync'
   'nemo'
@@ -85,4 +86,9 @@ package() {
   install -Dm644 applications/phantomos-settings.desktop "$pkgdir/usr/share/applications/phantomos-settings.desktop"
   install -Dm644 applications/phantomos-power.desktop "$pkgdir/usr/share/applications/phantomos-power.desktop"
   install -Dm644 applications/phantomos-btop.desktop "$pkgdir/usr/share/applications/phantomos-btop.desktop"
+  install -Dm755 bin/phantomos-sddm-autologin "$pkgdir/usr/lib/phantomos/phantomos-sddm-autologin"
+  install -Dm644 assets/sddm/phantomos/Main.qml "$pkgdir/usr/share/sddm/themes/phantomos/Main.qml"
+  install -Dm644 assets/sddm/phantomos/metadata.desktop "$pkgdir/usr/share/sddm/themes/phantomos/metadata.desktop"
+  install -Dm644 assets/sddm/phantomos/theme.conf "$pkgdir/usr/share/sddm/themes/phantomos/theme.conf"
+  install -Dm644 assets/sddm/90-phantomos-theme.conf "$pkgdir/usr/lib/sddm/sddm.conf.d/90-phantomos-theme.conf"
 }

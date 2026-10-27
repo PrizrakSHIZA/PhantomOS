@@ -56,5 +56,6 @@ end
 
 bind("fullscreen", mod .. " + F", hl.dsp.window.fullscreen())
 bind("power", mod .. " + SHIFT + E", hl.dsp.exec_cmd("phantomosctl power"))
-bind("screenshot_region", "PRINT", hl.dsp.exec_cmd("grim -g '$(slurp)' - | wl-copy"))
-bind("screenshot_screen", mod .. " + PRINT", hl.dsp.exec_cmd("grim - | wl-copy"))
+bind("screenshot_screen", "PRINT", hl.dsp.exec_cmd("phantomosctl screenshot-screen"))
+bind("screenshot_window", "ALT + PRINT", hl.dsp.exec_cmd("phantomosctl screenshot-window"))
+bind("screenshot_region", mod .. " + SHIFT + S", hl.dsp.exec_cmd("phantomosctl screenshot-region"))

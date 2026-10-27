@@ -45,6 +45,7 @@ pkgbase = phantomos-git
 	depends = qt6ct
 	depends = rofi-wayland
 	depends = slurp
+	depends = sddm
 	depends = grim
 	depends = swaync
 	depends = nemo

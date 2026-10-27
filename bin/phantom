@@ -32,6 +32,7 @@ Usage: phantom <command>
   menu                 Open the application menu
   power                Open power actions
   wallpaper            Choose a desktop wallpaper
+  screenshot [type]    Copy screen, window, or selected region to clipboard
   help                 Show this help
 
 `phantom update` refreshes user configuration. AUR package updates are handled
@@ -206,6 +207,12 @@ def main(args: list[str]) -> int:
             print("phantom: setup does not accept arguments", file=sys.stderr)
             return 2
         return setup()
+    if command == "screenshot":
+        if len(rest) > 1 or (rest and rest[0] not in {"screen", "window", "region"}):
+            print("phantom: screenshot type must be screen, window, or region", file=sys.stderr)
+            return 2
+        kind = rest[0] if rest else "region"
+        return run_ctl("screenshot-" + kind)
     if command == "update":
         if rest:
             print("phantom: update does not accept options", file=sys.stderr)
