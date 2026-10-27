@@ -144,7 +144,7 @@ def waybar_bar(mode: str, ctl: str, output: str | None = None, side: str = "left
 
     if output:
         bar["output"] = output
-        bar["name"] = f"phantom-relax-{output}"
+        bar["name"] = "phantom-relax"
     return bar
 
 
