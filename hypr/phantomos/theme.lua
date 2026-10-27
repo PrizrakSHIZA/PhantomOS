@@ -1,9 +1,25 @@
 local homeDir = os.getenv("HOME") or ""
 local currentPath = os.getenv("PATH") or "/usr/local/bin:/usr/bin"
 hl.env("PATH", homeDir .. "/.local/bin:" .. currentPath)
-hl.env("XCURSOR_THEME", "Bibata-Modern-Ice")
+hl.env("XCURSOR_THEME", "Adwaita")
 hl.env("XCURSOR_SIZE", "24")
+hl.env("GTK_THEME", "Adwaita:dark")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
+
+local configHome = os.getenv("XDG_CONFIG_HOME") or (homeDir .. "/.config")
+local settingsDir = configHome .. "/phantomos/settings"
+
+local function read_setting(name, fallback)
+    local file = io.open(settingsDir .. "/" .. name, "r")
+    if file == nil then return fallback end
+    local value = file:read("*l")
+    file:close()
+    return value or fallback
+end
+
+local keyboard_layouts = read_setting("keyboard-layouts", "us,ru")
+local mouse_sensitivity = tonumber(read_setting("mouse-sensitivity", "0")) or 0
 
 hl.config({
     general = {
@@ -34,10 +50,10 @@ hl.config({
         },
     },
     input = {
-        kb_layout = "us,ru",
-        kb_options = "grp:alt_shift_toggle",
+        kb_layout = keyboard_layouts,
+        kb_options = "grp:ctrl_shift_toggle",
         follow_mouse = 1,
-        sensitivity = 0,
+        sensitivity = mouse_sensitivity,
     },
     misc = {
         disable_hyprland_logo = true,
@@ -51,4 +67,5 @@ hl.curve("phantomSoft", {
 })
 hl.animation({ leaf = "global", enabled = true, speed = 5, curve = "phantomSoft" })
 hl.animation({ leaf = "windows", enabled = true, speed = 5, curve = "phantomSoft", style = "popin 92%" })
+hl.animation({ leaf = "layers", enabled = true, speed = 4, curve = "phantomSoft", style = "fade" })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 6, curve = "phantomSoft", style = "slidefade 18%" })

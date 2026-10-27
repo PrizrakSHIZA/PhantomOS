@@ -41,8 +41,9 @@ if ((NO_PACKAGES == 0)); then
 
     packages=(
         hyprland waybar rofi-wayland kitty micro python code
-        hyprpaper hyprlock swaync polkit-gnome pavucontrol nwg-displays
-        network-manager-applet blueman thunar
+        hyprpaper hyprlock swaync polkit-gnome pavucontrol easyeffects lsp-plugins-lv2
+        nwg-displays nwg-look qt6ct kvantum zenity adw-gtk-theme pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber
+        networkmanager network-manager-applet bluez bluez-utils blueman thunar
         xdg-desktop-portal xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
         grim slurp wl-clipboard
         papirus-icon-theme ttf-jetbrains-mono-nerd ttf-font-awesome
@@ -50,6 +51,26 @@ if ((NO_PACKAGES == 0)); then
     )
     printf 'Installing packages. NVIDIA drivers and system boot settings are left untouched.\n'
     sudo pacman -S --needed "${packages[@]}"
+    if command -v systemctl >/dev/null 2>&1; then
+        if ! systemctl is-active --quiet bluetooth.service; then
+            sudo systemctl enable --now bluetooth.service
+        fi
+
+        if ! systemctl is-active --quiet NetworkManager.service; then
+            existing_network_manager=0
+            for service in systemd-networkd.service iwd.service dhcpcd.service; do
+                if systemctl is-active --quiet "$service" || systemctl is-enabled --quiet "$service"; then
+                    existing_network_manager=1
+                    break
+                fi
+            done
+            if ((existing_network_manager == 0)); then
+                sudo systemctl enable --now NetworkManager.service
+            else
+                printf 'Keeping the existing network service; NetworkManager was not enabled.\n'
+            fi
+        fi
+    fi
 fi
 
 version_output="$(hyprland --version 2>/dev/null | head -n 1 || true)"
@@ -66,6 +87,7 @@ if ((version_major == 0 && version_minor < 55)); then
 fi
 
 mkdir -p "$CONFIG_HOME/hypr" "$CONFIG_HOME/waybar" "$CONFIG_HOME/rofi" "$CONFIG_HOME/kitty"
+mkdir -p "$HOME/.local/share/applications"
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/phantomos/wallpapers" "$STATE_HOME/phantomos"
 
 timestamp="$(date +%Y%m%d-%H%M%S)"
@@ -104,6 +126,8 @@ backup_and_install "$ROOT_DIR/bin/phantomosctl" "$HOME/.local/bin/phantomosctl"
 backup_and_install "$ROOT_DIR/hypr/hyprpaper.conf" "$CONFIG_HOME/hypr/hyprpaper.conf"
 backup_and_install "$ROOT_DIR/hypr/hyprlock.conf" "$CONFIG_HOME/hypr/hyprlock.conf"
 backup_and_install "$ROOT_DIR/assets/phantomos-night.png" "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png"
+backup_and_install "$ROOT_DIR/applications/phantomos-settings.desktop" "$HOME/.local/share/applications/phantomos-settings.desktop"
+backup_and_install "$ROOT_DIR/applications/phantomos-power.desktop" "$HOME/.local/share/applications/phantomos-power.desktop"
 chmod 0755 "$HOME/.local/bin/phantomosctl"
 
 if [[ ! -e "$CONFIG_HOME/kitty/kitty.conf" ]]; then

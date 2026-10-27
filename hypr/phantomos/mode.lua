@@ -144,6 +144,7 @@ local function apply_visual_profile(value)
             decoration = { rounding = 17, rounding_power = 2.6 },
         })
         hl.animation({ leaf = "windows", enabled = true, speed = 7, curve = "phantomSoft", style = "popin 88%" })
+        hl.animation({ leaf = "layers", enabled = true, speed = 5, curve = "phantomSoft", style = "fade" })
         hl.animation({ leaf = "workspaces", enabled = true, speed = 8, curve = "phantomSoft", style = "slidefade 24%" })
     else
         hl.config({
@@ -151,6 +152,7 @@ local function apply_visual_profile(value)
             decoration = { rounding = 9, rounding_power = 2 },
         })
         hl.animation({ leaf = "windows", enabled = true, speed = 5, curve = "phantomSoft", style = "popin 92%" })
+        hl.animation({ leaf = "layers", enabled = true, speed = 4, curve = "phantomSoft", style = "fade" })
         hl.animation({ leaf = "workspaces", enabled = true, speed = 6, curve = "phantomSoft", style = "slidefade 18%" })
     end
 end

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Питание PhantomOS
+Name[en]=PhantomOS Power
+Comment=Блокировка, выход, перезапуск и выключение
+Comment[en]=Lock, log out, restart or power off
+Exec=phantomosctl power
+TryExec=phantomosctl
+Icon=system-shutdown
+Terminal=false
+Type=Application
+Categories=System;
+Keywords=power;shutdown;restart;logout;lock;

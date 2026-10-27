@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -17,6 +18,7 @@ CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME_DIR / ".config"))
 STATE_HOME = Path(os.environ.get("XDG_STATE_HOME", HOME_DIR / ".local/state"))
 PHANTOM_CONFIG = CONFIG_HOME / "phantomos"
 MODE_FILE = STATE_HOME / "phantomos" / "mode"
+SETTINGS_DIR = CONFIG_HOME / "phantomos" / "settings"
 WAYBAR_CONFIG = PHANTOM_CONFIG / "waybar.json"
 WAYBAR_STYLE = CONFIG_HOME / "waybar" / "phantomos.css"
 ROFI_THEME = CONFIG_HOME / "rofi" / "phantomos.rasi"
@@ -226,33 +228,240 @@ def open_menu() -> None:
     run_rofi(["-show", "drun", "-show-icons"])
 
 
+def launch_first_available(*commands: list[str]) -> None:
+    for command in commands:
+        if shutil.which(command[0]):
+            launch(command)
+            return
+    notify("Нужная утилита не установлена. Повтори установку PhantomOS.")
+
+
+def open_appearance_settings() -> None:
+    choices = ["GTK: темы, значки и курсор", "Qt: оформление приложений", "Тема Kvantum", "Обои рабочего стола", "Править оформление PhantomOS"]
+    selected = dmenu("Настройки · Внешний вид", choices)
+    if selected == choices[0]:
+        launch_first_available(["nwg-look"])
+    elif selected == choices[1]:
+        launch_first_available(["qt6ct"])
+    elif selected == choices[2]:
+        launch_first_available(["kvantummanager"])
+    elif selected == choices[3]:
+        choose_wallpaper()
+    elif selected == choices[4]:
+        launch_first_available(["code", str(CONFIG_HOME / "hypr" / "phantomos" / "theme.lua")],
+                               ["kitty", "micro", str(CONFIG_HOME / "hypr" / "phantomos" / "theme.lua")])
+
+
+def set_wallpaper(wallpaper: Path) -> None:
+    wallpaper = wallpaper.expanduser().resolve()
+    if not wallpaper.is_file() or "," in str(wallpaper):
+        raise RuntimeError("Не удалось использовать этот файл обоев.")
+
+    active_outputs = outputs()
+    if not active_outputs:
+        active_outputs = [{"name": ""}]
+    for output in active_outputs:
+        run_checked(["hyprctl", "hyprpaper", "wallpaper", f"{output['name']}, {wallpaper}, cover"])
+
+    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+    (SETTINGS_DIR / "wallpaper").write_text(str(wallpaper) + "\n", encoding="utf-8")
+    lock_config = CONFIG_HOME / "hypr" / "hyprlock.conf"
+    if lock_config.exists():
+        content = lock_config.read_text(encoding="utf-8")
+        content, replacements = re.subn(
+            r"(?m)^(\s*path\s*=\s*).*$",
+            lambda match: match.group(1) + str(wallpaper),
+            content,
+            count=1,
+        )
+        if replacements:
+            lock_config.write_text(content, encoding="utf-8")
+    notify("Обои применены и сохранены.")
+
+
+def apply_saved_wallpaper(wait_for_service: bool = False) -> None:
+    try:
+        wallpaper = Path((SETTINGS_DIR / "wallpaper").read_text(encoding="utf-8").strip())
+    except OSError:
+        return
+    if not wallpaper.is_file():
+        notify("Сохранённые обои не найдены.")
+        return
+
+    attempts = 12 if wait_for_service else 1
+    for _ in range(attempts):
+        active_outputs = outputs()
+        if active_outputs:
+            for output in active_outputs:
+                result = subprocess.run(
+                    ["hyprctl", "hyprpaper", "wallpaper", f"{output['name']}, {wallpaper}, cover"],
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode != 0:
+                    break
+            else:
+                lock_config = CONFIG_HOME / "hypr" / "hyprlock.conf"
+                if lock_config.exists():
+                    content = lock_config.read_text(encoding="utf-8")
+                    content, replacements = re.subn(
+                        r"(?m)^(\s*path\s*=\s*).*$",
+                        lambda match: match.group(1) + str(wallpaper),
+                        content,
+                        count=1,
+                    )
+                    if replacements:
+                        lock_config.write_text(content, encoding="utf-8")
+                return
+        time.sleep(0.5)
+    notify("Не удалось применить сохранённые обои через hyprpaper.")
+
+
+def choose_wallpaper() -> None:
+    if shutil.which("zenity") is None:
+        launch(["thunar", str(HOME_DIR / ".local/share/phantomos/wallpapers")])
+        notify("Положи изображение в папку обоев. Для диалога выбора установи zenity.")
+        return
+    result = subprocess.run(
+        ["zenity", "--file-selection", "--title=Выбери обои PhantomOS",
+         "--file-filter=Изображения | *.png *.jpg *.jpeg *.webp *.bmp"],
+        text=True,
+        capture_output=True,
+    )
+    selected = result.stdout.strip()
+    if result.returncode == 0 and selected:
+        try:
+            set_wallpaper(Path(selected))
+        except (RuntimeError, OSError) as error:
+            notify(str(error))
+
+def open_audio_settings() -> None:
+    choices = ["Микшер и устройства", "Эквалайзер и эффекты"]
+    selected = dmenu("Настройки · Звук", choices)
+    if selected == choices[0]:
+        launch_first_available(["pavucontrol"])
+    elif selected == choices[1]:
+        launch_first_available(["easyeffects"], ["pavucontrol"])
+
+
+def change_mouse_sensitivity() -> None:
+    choices = [
+        "-1.0  ·  очень медленно", "-0.75", "-0.5", "-0.25", "0.0  ·  стандартная",
+        "0.25", "0.5", "0.75", "1.0  ·  очень быстро", "Ввести значение от -1 до 1…",
+    ]
+    selected = dmenu("Чувствительность мыши", choices)
+    if not selected:
+        return
+    if selected.startswith("Ввести"):
+        selected = dmenu("Значение чувствительности (-1…1)", ["0.0"])
+    try:
+        value = float(selected.split()[0])
+    except (ValueError, IndexError):
+        notify("Введи число от -1 до 1.")
+        return
+    if not -1.0 <= value <= 1.0:
+        notify("Допустимый диапазон чувствительности: от -1 до 1.")
+        return
+
+    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+    formatted = f"{value:.2f}".rstrip("0").rstrip(".")
+    (SETTINGS_DIR / "mouse-sensitivity").write_text(formatted + "\n", encoding="utf-8")
+    run_checked(["hyprctl", "eval", f"hl.config({{ input = {{ sensitivity = {formatted} }} }})"])
+    notify(f"Чувствительность мыши: {formatted}")
+
+
+KEYBOARD_LAYOUTS = {
+    "Английский (США) · us": "us",
+    "Русский · ru": "ru",
+    "Украинский · ua": "ua",
+    "Немецкий · de": "de",
+    "Французский · fr": "fr",
+    "Испанский · es": "es",
+    "Итальянский · it": "it",
+    "Польский · pl": "pl",
+    "Турецкий · tr": "tr",
+    "Японский · jp": "jp",
+}
+
+
+def current_keyboard_layouts() -> list[str]:
+    try:
+        value = (SETTINGS_DIR / "keyboard-layouts").read_text(encoding="utf-8").strip()
+        layouts = [item for item in value.split(",") if item in KEYBOARD_LAYOUTS.values()]
+        return layouts or ["us", "ru"]
+    except OSError:
+        return ["us", "ru"]
+
+
+def save_keyboard_layouts(layouts: list[str]) -> None:
+    layouts = list(dict.fromkeys(layout for layout in layouts if layout in KEYBOARD_LAYOUTS.values()))
+    if not layouts:
+        layouts = ["us"]
+    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+    value = ",".join(layouts)
+    (SETTINGS_DIR / "keyboard-layouts").write_text(value + "\n", encoding="utf-8")
+    expression = f'hl.config({{ input = {{ kb_layout = "{value}", kb_options = "grp:ctrl_shift_toggle" }} }})'
+    run_checked(["hyprctl", "eval", expression])
+    notify("Раскладки обновлены. Переключение: Ctrl+Shift.")
+
+
+def manage_keyboard_layouts() -> None:
+    current = current_keyboard_layouts()
+    choices = ["Добавить раскладку…", "Удалить раскладку…", "Показать текущие раскладки"]
+    selected = dmenu("Раскладки клавиатуры · Ctrl+Shift", choices)
+    if selected == choices[0]:
+        available = [label for label, code in KEYBOARD_LAYOUTS.items() if code not in current]
+        language = dmenu("Добавить язык ввода", available)
+        code = KEYBOARD_LAYOUTS.get(language)
+        if code:
+            save_keyboard_layouts(current + [code])
+    elif selected == choices[1]:
+        removable = [label for label, code in KEYBOARD_LAYOUTS.items() if code in current]
+        language = dmenu("Удалить раскладку", removable)
+        code = KEYBOARD_LAYOUTS.get(language)
+        if code and len(current) > 1:
+            save_keyboard_layouts([item for item in current if item != code])
+        elif code:
+            notify("Оставь хотя бы одну раскладку.")
+    elif selected == choices[2]:
+        labels = [label for label, code in KEYBOARD_LAYOUTS.items() if code in current]
+        notify("Текущие раскладки: " + ", ".join(labels))
+
+
+def open_input_settings() -> None:
+    choices = ["Чувствительность мыши", "Раскладки клавиатуры"]
+    selected = dmenu("Настройки · Мышь и клавиатура", choices)
+    if selected == choices[0]:
+        change_mouse_sensitivity()
+    elif selected == choices[1]:
+        manage_keyboard_layouts()
+
+
 def open_settings() -> None:
     choices = [
-        "Дисплеи",
-        "Аудио",
-        "Редактировать конфигурацию Hyprland",
-        "Открыть папку настроек",
+        "Внешний вид",
+        "Мониторы · разрешение и герцовка",
+        "Звук и эквалайзер",
+        "Мышь и клавиатура",
+        "Сеть",
+        "Bluetooth",
+        "Конфигурация PhantomOS",
     ]
-    if shutil.which("nm-connection-editor"):
-        choices.append("Сеть")
-    if shutil.which("blueman-manager"):
-        choices.append("Bluetooth")
-
     selected = dmenu("PhantomOS · Настройки", choices)
-    if selected == "Дисплеи":
-        launch(["nwg-displays"])
-    elif selected == "Аудио":
-        launch(["pavucontrol"])
-    elif selected == "Редактировать конфигурацию Hyprland":
-        launch(["kitty", "micro", str(CONFIG_HOME / "hypr" / "phantomos" / "mode.lua")])
-    elif selected == "Открыть папку настроек":
+    if selected == choices[0]:
+        open_appearance_settings()
+    elif selected == choices[1]:
+        launch_first_available(["nwg-displays"])
+    elif selected == choices[2]:
+        open_audio_settings()
+    elif selected == choices[3]:
+        open_input_settings()
+    elif selected == choices[4]:
+        launch_first_available(["nm-connection-editor"])
+    elif selected == choices[5]:
+        launch_first_available(["blueman-manager"])
+    elif selected == choices[6]:
         launch(["thunar", str(CONFIG_HOME / "hypr" / "phantomos")])
-    elif selected == "Сеть":
-        launch(["nm-connection-editor"])
-    elif selected == "Bluetooth":
-        launch(["blueman-manager"])
-
-
 def open_power_menu() -> None:
     choices = ["Заблокировать", "Приостановить", "Выйти из PhantomOS", "Перезагрузить", "Выключить"]
     selected = dmenu("PhantomOS · Питание", choices)
@@ -295,7 +504,7 @@ def print_mode_indicator(compact: bool = False) -> None:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: phantomosctl {menu|settings|power|toggle|mode-indicator|refresh-panels|focus-window ADDRESS}")
+        print("Usage: phantomosctl {menu|settings|power|toggle|mode-indicator|refresh-panels|apply-wallpaper|focus-window ADDRESS}")
         return 2
 
     action = sys.argv[1]
@@ -312,6 +521,8 @@ def main() -> int:
             print_mode_indicator(compact="compact" in sys.argv[2:])
         elif action == "refresh-panels":
             start_panels()
+        elif action == "apply-wallpaper":
+            apply_saved_wallpaper(wait_for_service="--wait" in sys.argv[2:])
         elif action == "focus-window" and len(sys.argv) == 3:
             focus_window(sys.argv[2])
         elif action == "show-mode":
