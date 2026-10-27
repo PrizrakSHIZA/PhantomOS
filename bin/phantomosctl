@@ -88,7 +88,7 @@ def waybar_bar(mode: str, ctl: str, output: str | None = None, side: str = "left
             else ["pulseaudio", "network", "clock", "tray", "custom/settings", "custom/power"]
         ),
         "custom/start": {
-            "format": "◈",
+            "format": "<span foreground='#bb9af7' weight='bold'>P</span><span foreground='#eee9ff' weight='bold'>OS</span>",
             "tooltip": "PhantomOS — меню приложений",
             "on-click": f"{ctl} menu",
         },
@@ -319,7 +319,7 @@ def apply_saved_wallpaper(wait_for_service: bool = False) -> None:
 
 def choose_wallpaper() -> None:
     if shutil.which("zenity") is None:
-        launch(["thunar", str(HOME_DIR / ".local/share/phantomos/wallpapers")])
+        launch(["nemo", str(HOME_DIR / ".local/share/phantomos/wallpapers")])
         notify("Положи изображение в папку обоев. Для диалога выбора установи zenity.")
         return
     result = subprocess.run(
@@ -464,7 +464,7 @@ def open_settings() -> None:
     elif selected == choices[5]:
         launch_first_available(["blueman-manager"])
     elif selected == choices[6]:
-        launch(["thunar", str(CONFIG_HOME / "hypr" / "phantomos")])
+        launch(["nemo", str(CONFIG_HOME / "hypr" / "phantomos")])
 def open_power_menu() -> None:
     choices = ["Заблокировать", "Приостановить", "Выйти из PhantomOS", "Перезагрузить", "Выключить"]
     selected = dmenu("PhantomOS · Питание", choices)

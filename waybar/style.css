@@ -57,7 +57,7 @@ window#waybar.phantom-relax > box {
 }
 
 #custom-start {
-    color: @cyan;
+    color: @text;
     font-size: 17px;
     padding: 5px 12px;
 }

@@ -1,39 +1,46 @@
 local mod = "SUPER"
+local HOME_DIR = os.getenv("HOME") or ""
+local CONFIG_HOME = os.getenv("XDG_CONFIG_HOME") or (HOME_DIR .. "/.config")
+local overrides = {}
+local override_file = io.open(CONFIG_HOME .. "/hypr/phantomos/keybindings.conf", "r")
+if override_file ~= nil then
+    for line in override_file:lines() do
+        local action, chord = line:match("^([%w_]+)=([%w_+]+)$")
+        if action ~= nil and chord ~= nil then overrides[action] = chord:gsub("%+", " + ") end
+    end
+    override_file:close()
+end
+
+local function bind(action, default, callback)
+    local chord = overrides[action] or default
+    hl.bind(chord, callback)
+end
 
 local function current_monitor_group_offset()
     local monitors = hl.get_monitors()
     if #monitors < 2 then return 0 end
-    table.sort(monitors, function(a, b)
-        return a.position.x < b.position.x
-    end)
+    table.sort(monitors, function(a, b) return a.position.x < b.position.x end)
     local active = hl.get_active_monitor()
     if active ~= nil and active.name ~= monitors[1].name then return 5 end
     return 0
 end
 
-hl.bind(mod .. " + TAB", function()
-    PhantomOS.toggle_mode()
-end)
-hl.bind(mod .. " + D", hl.dsp.exec_cmd("phantomosctl menu"))
-hl.bind(mod .. " + I", hl.dsp.exec_cmd("phantomosctl settings"))
-hl.bind(mod .. " + RETURN", hl.dsp.exec_cmd("kitty"))
-hl.bind(mod .. " + Q", hl.dsp.window.close())
-hl.bind(mod .. " + V", hl.dsp.window.float({ action = "toggle" }))
-hl.bind("ALT + TAB", hl.dsp.window.cycle_next())
+bind("toggle_mode", mod .. " + TAB", function() PhantomOS.toggle_mode() end)
+bind("menu", mod .. " + D", hl.dsp.exec_cmd("phantomosctl menu"))
+bind("settings", mod .. " + I", hl.dsp.exec_cmd("phantomosctl settings"))
+bind("terminal", mod .. " + RETURN", hl.dsp.exec_cmd("kitty"))
+bind("close_window", mod .. " + Q", hl.dsp.window.close())
+bind("toggle_float", mod .. " + V", hl.dsp.window.float({ action = "toggle" }))
+bind("cycle_window", "ALT + TAB", hl.dsp.window.cycle_next())
 
 for index = 1, 5 do
     local workspace_index = index
-    local key = tostring(workspace_index)
-
-    hl.bind(mod .. " + " .. key, function()
+    bind("workspace_" .. index, mod .. " + " .. index, function()
         local workspace = workspace_index + current_monitor_group_offset()
-        if PhantomOS.mode() == "relax" then
-            workspace = workspace > 5 and 6 or 1
-        end
+        if PhantomOS.mode() == "relax" then workspace = workspace > 5 and 6 or 1 end
         hl.dispatch(hl.dsp.focus({ workspace = workspace }))
     end)
-
-    hl.bind(mod .. " + SHIFT + " .. key, function()
+    bind("move_workspace_" .. index, mod .. " + SHIFT + " .. index, function()
         if PhantomOS.mode() == "work" then
             local workspace = workspace_index + current_monitor_group_offset()
             hl.dispatch(hl.dsp.window.move({ workspace = workspace, follow = false }))
@@ -41,15 +48,13 @@ for index = 1, 5 do
     end)
 end
 
-hl.bind(mod .. " + J", hl.dsp.focus({ direction = "d" }))
-hl.bind(mod .. " + K", hl.dsp.focus({ direction = "u" }))
-hl.bind(mod .. " + H", hl.dsp.focus({ direction = "l" }))
-hl.bind(mod .. " + L", hl.dsp.focus({ direction = "r" }))
-hl.bind(mod .. " + SHIFT + J", hl.dsp.window.move({ direction = "d" }))
-hl.bind(mod .. " + SHIFT + K", hl.dsp.window.move({ direction = "u" }))
-hl.bind(mod .. " + SHIFT + H", hl.dsp.window.move({ direction = "l" }))
-hl.bind(mod .. " + SHIFT + L", hl.dsp.window.move({ direction = "r" }))
-hl.bind(mod .. " + F", hl.dsp.window.fullscreen())
-hl.bind(mod .. " + SHIFT + E", hl.dsp.exec_cmd("phantomosctl power"))
-hl.bind("PRINT", hl.dsp.exec_cmd("grim -g '$(slurp)' - | wl-copy"))
-hl.bind(mod .. " + PRINT", hl.dsp.exec_cmd("grim - | wl-copy"))
+for _, direction in ipairs({ {"left", "H", "l"}, {"down", "J", "d"}, {"up", "K", "u"}, {"right", "L", "r"} }) do
+    local id, key, vector = direction[1], direction[2], direction[3]
+    bind("focus_" .. id, mod .. " + " .. key, hl.dsp.focus({ direction = vector }))
+    bind("move_" .. id, mod .. " + SHIFT + " .. key, hl.dsp.window.move({ direction = vector }))
+end
+
+bind("fullscreen", mod .. " + F", hl.dsp.window.fullscreen())
+bind("power", mod .. " + SHIFT + E", hl.dsp.exec_cmd("phantomosctl power"))
+bind("screenshot_region", "PRINT", hl.dsp.exec_cmd("grim -g '$(slurp)' - | wl-copy"))
+bind("screenshot_screen", mod .. " + PRINT", hl.dsp.exec_cmd("grim - | wl-copy"))

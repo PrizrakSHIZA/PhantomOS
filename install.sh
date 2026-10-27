@@ -40,10 +40,10 @@ if ((NO_PACKAGES == 0)); then
     command -v sudo >/dev/null 2>&1 || { echo 'Install sudo, then rerun ./install.sh.' >&2; exit 1; }
 
     packages=(
-        hyprland waybar rofi-wayland kitty micro python code gtk3 python-gobject git btop
+        hyprland waybar rofi-wayland kitty micro python code gtk3 python-gobject git btop audacious haruna xdg-utils
         hyprpaper hyprlock swaync polkit-gnome pavucontrol easyeffects lsp-plugins-lv2
         nwg-displays nwg-look qt6ct kvantum zenity adw-gtk-theme pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber
-        networkmanager network-manager-applet bluez bluez-utils blueman thunar
+        networkmanager network-manager-applet bluez bluez-utils blueman nemo gvfs gvfs-mtp tumbler ffmpegthumbnailer file-roller
         xdg-desktop-portal xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
         grim slurp wl-clipboard
         papirus-icon-theme ttf-jetbrains-mono-nerd ttf-font-awesome
@@ -86,7 +86,7 @@ if ((version_major == 0 && version_minor < 55)); then
     exit 1
 fi
 
-mkdir -p "$CONFIG_HOME/hypr" "$CONFIG_HOME/waybar" "$CONFIG_HOME/rofi" "$CONFIG_HOME/kitty"
+mkdir -p "$CONFIG_HOME/hypr" "$CONFIG_HOME/waybar" "$CONFIG_HOME/rofi" "$CONFIG_HOME/kitty" "$CONFIG_HOME/gtk-3.0"
 mkdir -p "$HOME/.local/share/applications"
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/phantomos/wallpapers" "$STATE_HOME/phantomos"
 
@@ -119,6 +119,7 @@ while IFS= read -r -d '' source_file; do
 done < <(find "$ROOT_DIR/hypr/phantomos" -type f -print0)
 touch "$MANAGED_MARK"
 
+backup_and_install "$ROOT_DIR/gtk/settings.ini" "$CONFIG_HOME/gtk-3.0/settings.ini"
 backup_and_install "$ROOT_DIR/waybar/style.css" "$CONFIG_HOME/waybar/phantomos.css"
 backup_and_install "$ROOT_DIR/rofi/phantomos.rasi" "$CONFIG_HOME/rofi/phantomos.rasi"
 backup_and_install "$ROOT_DIR/kitty/kitty.conf" "$CONFIG_HOME/kitty/phantomos.conf"
@@ -153,3 +154,14 @@ fi
 
 printf '\nPhantomOS is installed. Restart Hyprland and use Super+Tab to switch modes.\n'
 printf 'Project: %s\nBackups: %s\n' "$ROOT_DIR" "$BACKUP_ROOT"
+
+# Set reliable per-user defaults; users can still choose another app with Open With.
+if command -v xdg-mime >/dev/null 2>&1; then
+    xdg-mime default nemo.desktop inode/directory || true
+    for mime in video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo video/mpeg; do
+        xdg-mime default org.kde.haruna.desktop "$mime" || true
+    done
+    for mime in audio/mpeg audio/flac audio/ogg audio/opus audio/wav audio/x-wav audio/aac audio/x-m4a; do
+        xdg-mime default audacious.desktop "$mime" || true
+    done
+fi
