@@ -1,0 +1,80 @@
+# Maintainer: PhantomOS contributors
+pkgname=phantomos-git
+pkgver=r5.20261027
+pkgrel=1
+pkgdesc='Tokyo Night Hyprland desktop with Work and Relax modes'
+arch=('any')
+url='https://github.com/PrizrakSHIZA/PhantomOS'
+# TODO: choose and add a project license before publishing this PKGBUILD to AUR.
+license=('custom')
+depends=(
+  'bash'
+  'adw-gtk-theme'
+  'bluez'
+  'bluez-utils'
+  'blueman'
+  'btop'
+  'code'
+  'easyeffects'
+  'git'
+  'gtk3'
+  'hyprland>=0.55'
+  'hyprlock'
+  'hyprpaper'
+  'kitty'
+  'kvantum'
+  'lsp-plugins-lv2'
+  'micro'
+  'network-manager-applet'
+  'networkmanager'
+  'noto-fonts'
+  'noto-fonts-emoji'
+  'nwg-displays'
+  'nwg-look'
+  'papirus-icon-theme'
+  'pavucontrol'
+  'pipewire'
+  'pipewire-alsa'
+  'pipewire-audio'
+  'pipewire-pulse'
+  'polkit-gnome'
+  'python'
+  'python-gobject'
+  'qt6ct'
+  'rofi-wayland'
+  'slurp'
+  'grim'
+  'swaync'
+  'thunar'
+  'ttf-font-awesome'
+  'ttf-jetbrains-mono-nerd'
+  'waybar'
+  'wireplumber'
+  'wl-clipboard'
+  'xdg-desktop-portal'
+  'xdg-desktop-portal-gtk'
+  'xdg-desktop-portal-hyprland'
+  'zenity'
+)
+makedepends=('git')
+provides=('phantomos')
+conflicts=('phantomos')
+source=("$pkgname::git+https://github.com/PrizrakSHIZA/PhantomOS.git#branch=main")
+sha256sums=('SKIP')
+install=phantomos.install
+
+pkgver() {
+  cd "$srcdir/$pkgname"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git log -1 --format=%cd --date=format:%Y%m%d)"
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+  install -d "$pkgdir/usr/share/phantomos"
+  cp -a . "$pkgdir/usr/share/phantomos/"
+  rm -rf "$pkgdir/usr/share/phantomos/.git" "$pkgdir/usr/share/phantomos/packaging"
+  install -Dm755 "$srcdir/$pkgname/packaging/aur/phantom-wrapper" "$pkgdir/usr/bin/phantom"
+  install -Dm644 applications/phantomos-settings.desktop "$pkgdir/usr/share/applications/phantomos-settings.desktop"
+  install -Dm644 applications/phantomos-power.desktop "$pkgdir/usr/share/applications/phantomos-power.desktop"
+  install -Dm644 applications/phantomos-btop.desktop "$pkgdir/usr/share/applications/phantomos-btop.desktop"
+}

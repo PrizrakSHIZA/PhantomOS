@@ -16,13 +16,15 @@ REPOSITORY = "https://github.com/PrizrakSHIZA/PhantomOS.git"
 BRANCH = "main"
 HOME = Path.home()
 CTL = HOME / ".local/bin/phantomosctl"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def usage() -> None:
     print("""PhantomOS command hub
 
 Usage: phantom <command>
-  update               Download the latest PhantomOS and install it
+  update               Refresh PhantomOS configuration from GitHub
+  setup                Apply the installed PhantomOS configuration
   mode                 Show the current desktop mode
   toggle               Switch Work / Relax mode
   work | relax         Select a desktop mode
@@ -32,7 +34,8 @@ Usage: phantom <command>
   wallpaper            Choose a desktop wallpaper
   help                 Show this help
 
-`phantom update` updates PhantomOS configuration only.""")
+`phantom update` refreshes user configuration. AUR package updates are handled
+by yay; run `phantom setup` after a package upgrade to apply the new defaults.""")
 
 
 def run_ctl(action: str) -> int:
@@ -185,11 +188,24 @@ def update() -> int:
     return window.result
 
 
+def setup() -> int:
+    installer = PROJECT_ROOT / "install.sh"
+    if not installer.is_file():
+        print("phantom: packaged install.sh was not found", file=sys.stderr)
+        return 1
+    return subprocess.run(["bash", str(installer), "--no-packages"], cwd=PROJECT_ROOT).returncode
+
+
 def main(args: list[str]) -> int:
     if not args or args[0] in ("help", "--help", "-h"):
         usage()
         return 0
     command, *rest = args
+    if command == "setup":
+        if rest:
+            print("phantom: setup does not accept arguments", file=sys.stderr)
+            return 2
+        return setup()
     if command == "update":
         if rest:
             print("phantom: update does not accept options", file=sys.stderr)

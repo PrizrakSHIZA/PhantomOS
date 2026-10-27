@@ -1,0 +1,3 @@
+#!/bin/sh
+export PHANTOMOS_PACKAGE_MODE=1
+exec /usr/bin/python /usr/share/phantomos/bin/phantom "$@"
