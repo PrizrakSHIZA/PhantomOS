@@ -20,6 +20,14 @@ end
 
 local keyboard_layouts = read_setting("keyboard-layouts", "us,ru")
 local mouse_sensitivity = tonumber(read_setting("mouse-sensitivity", "0")) or 0
+local active_accent = read_setting("accent", "")
+if active_accent:match("^#%x%x%x%x%x%x$") then
+    active_accent = "rgb(" .. active_accent:sub(2) .. ")"
+else
+    active_accent = "rgb(7aa2f7)"
+end
+local work_rounding = tonumber(read_setting("rounding-work", "9")) or 9
+local relax_rounding = tonumber(read_setting("rounding-relax", "17")) or 17
 
 hl.config({
     general = {
@@ -28,11 +36,11 @@ hl.config({
         border_size = 2,
         layout = "dwindle",
         resize_on_border = true,
-        ["col.active_border"] = "rgb(7aa2f7)",
+        ["col.active_border"] = active_accent,
         ["col.inactive_border"] = "rgb(3b4261)",
     },
     decoration = {
-        rounding = 9,
+        rounding = work_rounding,
         rounding_power = 2,
         active_opacity = 1.0,
         inactive_opacity = 0.96,
@@ -60,6 +68,9 @@ hl.config({
         disable_splash_rendering = true,
     },
 })
+
+PhantomOS = PhantomOS or {}
+PhantomOS.rounding = { work = work_rounding, relax = relax_rounding }
 
 hl.curve("phantomSoft", {
     type = "bezier",

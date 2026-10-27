@@ -438,6 +438,9 @@ def open_input_settings() -> None:
 
 
 def open_settings() -> None:
+    if shutil.which("phantomos-settings"):
+        launch(["phantomos-settings"])
+        return
     choices = [
         "Внешний вид",
         "Мониторы · разрешение и герцовка",
@@ -523,6 +526,8 @@ def main() -> int:
             start_panels()
         elif action == "apply-wallpaper":
             apply_saved_wallpaper(wait_for_service="--wait" in sys.argv[2:])
+        elif action == "wallpaper":
+            choose_wallpaper()
         elif action == "focus-window" and len(sys.argv) == 3:
             focus_window(sys.argv[2])
         elif action == "show-mode":

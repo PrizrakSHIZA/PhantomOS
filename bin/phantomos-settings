@@ -1,0 +1,310 @@
+#!/usr/bin/env python3
+"""Native PhantomOS settings window. Advanced device editors remain one click away."""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gdk, Gtk
+
+HOME = Path.home()
+CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
+STATE = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state"))
+SETTINGS = CONFIG / "phantomos/settings"
+SHARE = HOME / ".local/share/phantomos"
+PALETTES = {
+    "Tokyo Night": {"base":"#1a1b26", "surface":"#24283b", "surface2":"#343b58", "overlay":"#414868", "muted":"#565f89", "text":"#c0caf5", "subtext":"#a9b1d6", "accent":"#7aa2f7", "cyan":"#7dcfff", "purple":"#bb9af7", "magenta":"#ff7a93", "green":"#9ece6a", "yellow":"#e0af68"},
+    "Dracula": {"base":"#282a36", "surface":"#343746", "surface2":"#44475a", "overlay":"#6272a4", "muted":"#6272a4", "text":"#f8f8f2", "subtext":"#d7d9e5", "accent":"#bd93f9", "cyan":"#8be9fd", "purple":"#bd93f9", "magenta":"#ff79c6", "green":"#50fa7b", "yellow":"#f1fa8c"},
+    "Phantom Violet": {"base":"#171522", "surface":"#242035", "surface2":"#342d4c", "overlay":"#51456f", "muted":"#766b91", "text":"#eee9ff", "subtext":"#c4badf", "accent":"#a78bfa", "cyan":"#7dd3fc", "purple":"#c084fc", "magenta":"#f472b6", "green":"#86efac", "yellow":"#fcd34d"},
+    "Nord": {"base":"#2e3440", "surface":"#3b4252", "surface2":"#434c5e", "overlay":"#4c566a", "muted":"#616e88", "text":"#eceff4", "subtext":"#d8dee9", "accent":"#88c0d0", "cyan":"#8fbcbb", "purple":"#b48ead", "magenta":"#bf616a", "green":"#a3be8c", "yellow":"#ebcb8b"},
+}
+TOKYO = PALETTES["Tokyo Night"]
+
+
+def setting(name: str, default: str = "") -> str:
+    try: return (SETTINGS / name).read_text(encoding="utf-8").strip()
+    except OSError: return default
+
+
+def save(name: str, value: str) -> None:
+    SETTINGS.mkdir(parents=True, exist_ok=True)
+    (SETTINGS / name).write_text(value + "\n", encoding="utf-8")
+
+
+def notify(text: str) -> None:
+    if shutil.which("notify-send"):
+        subprocess.Popen(["notify-send", "PhantomOS", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def launch(*commands: list[str]) -> None:
+    for command in commands:
+        if shutil.which(command[0]):
+            subprocess.Popen(command, start_new_session=True)
+            return
+    notify("Для этого действия не найдена нужная программа.")
+
+
+def apply_palette(name: str, custom: str | None = None) -> None:
+    palette = dict(PALETTES.get(name, PALETTES["Tokyo Night"]))
+    if custom:
+        palette["accent"] = custom
+        palette["purple"] = custom
+    previous = dict(PALETTES.get(setting("theme", "Tokyo Night"), PALETTES["Tokyo Night"]))
+    previous_accent = setting("accent")
+    if previous_accent:
+        previous["accent"] = previous_accent
+        previous["purple"] = previous_accent
+    if custom:
+        palette["accent"] = custom
+        palette["purple"] = custom
+    replacements = {previous[key].lower(): palette[key].lower() for key in palette if key in previous}
+    for target in (CONFIG / "waybar/phantomos.css", CONFIG / "rofi/phantomos.rasi"):
+        if target.exists():
+            content = target.read_text(encoding="utf-8")
+            for old, new in replacements.items(): content = content.replace(old, new)
+            target.write_text(content, encoding="utf-8")
+    kitty = CONFIG / "kitty/phantomos.conf"
+    if kitty.exists():
+        values = {
+            "background": palette["base"], "foreground": palette["text"],
+            "selection_background": palette["accent"], "selection_foreground": palette["text"],
+            "cursor": palette["text"], "cursor_text_color": palette["base"], "url_color": palette["cyan"],
+            "color0": palette["base"], "color1": palette["magenta"], "color2": palette["green"],
+            "color3": palette["yellow"], "color4": palette["accent"], "color5": palette["purple"],
+            "color6": palette["cyan"], "color7": palette["subtext"], "color8": palette["overlay"],
+            "color9": palette["magenta"], "color10": palette["green"], "color11": palette["yellow"],
+            "color12": palette["accent"], "color13": palette["purple"], "color14": palette["cyan"],
+            "color15": palette["text"],
+        }
+        lines = kitty.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            key = line.split(maxsplit=1)[0] if line.strip() else ""
+            if key in values:
+                lines[index] = f"{key} {values[key]}"
+        kitty.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    save("theme", name)
+    save("accent", custom or palette["accent"])
+    try:
+        subprocess.run(["hyprctl", "eval", f'hl.config({{ general = {{ ["col.active_border"] = "rgb({palette["accent"][1:]})" }} }})'], check=True, capture_output=True)
+        subprocess.run([str(HOME / ".local/bin/phantomosctl"), "refresh-panels"], check=True, capture_output=True)
+    except (OSError, subprocess.CalledProcessError): pass
+
+
+CSS = """window.phantom { background: @BASE@; color: @TEXT@; }
+headerbar { background: @BASE@; color: @TEXT@; border-bottom: 1px solid @SURFACE2@; }
+button { background: @SURFACE@; color: @TEXT@; border: 1px solid @SURFACE2@; border-radius: 10px; padding: 9px 12px; }
+button:hover, button:checked { background: @SURFACE2@; border-color: @ACCENT@; }
+entry, spinbutton, combobox button { background: @SURFACE@; color: @TEXT@; border: 1px solid @SURFACE2@; border-radius: 8px; padding: 7px; }
+list { background: transparent; } list row { border-radius: 9px; margin: 3px 6px; }
+list row:selected { background: @SURFACE2@; color: @TEXT@; }
+frame { border: 1px solid @SURFACE2@; border-radius: 12px; padding: 12px; }
+label.dim-label { color: @SUBTEXT@; } scale trough { background: @SURFACE2@; border-radius: 8px; } scale highlight { background: @ACCENT@; }
+"""
+
+
+class SettingsWindow(Gtk.Window):
+    def __init__(self) -> None:
+        super().__init__(title="PhantomOS Settings")
+        self.set_default_size(980, 660)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.get_style_context().add_class("phantom")
+        self.provider = Gtk.CssProvider()
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self.provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.palette_name = setting("theme", "Tokyo Night")
+        self.custom_accent = setting("accent")
+        self.apply_app_css()
+        root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.add(root)
+        nav = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
+        nav.set_size_request(218, -1); nav.set_margin_top(22); nav.set_margin_start(14); nav.set_margin_end(12)
+        root.pack_start(nav, False, False, 0)
+        brand = Gtk.Label(); brand.set_markup('<span size="18000" weight="bold">◈ PhantomOS</span>\n<span alpha="75%">Настройки системы</span>'); brand.set_xalign(0); brand.set_margin_bottom(20)
+        nav.pack_start(brand, False, False, 0)
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.SLIDE_LEFT_RIGHT, transition_duration=180)
+        pages = [("overview", "⌂   Обзор", self.overview_page), ("appearance", "◐   Внешний вид", self.appearance_page), ("display", "▣   Дисплеи", self.display_page), ("sound", "♫   Звук", self.sound_page), ("input", "⌨   Устройства ввода", self.input_page), ("network", "⌁   Сеть и Bluetooth", self.network_page), ("system", "⚙   Система", self.system_page)]
+        for name, label, builder in pages:
+            button = Gtk.Button(label=label); button.set_relief(Gtk.ReliefStyle.NONE); button.set_halign(Gtk.Align.FILL)
+            button.connect("clicked", lambda _b, page=name: self.stack.set_visible_child_name(page))
+            nav.pack_start(button, False, False, 0)
+            page = Gtk.ScrolledWindow(); page.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC); page.add(builder())
+            self.stack.add_named(page, name)
+        nav.pack_end(Gtk.Label(label="PhantomOS  •  Arch + Hyprland"), False, False, 8)
+        root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 0)
+        root.pack_start(self.stack, True, True, 0)
+        self.stack.set_visible_child_name("appearance")
+
+    def apply_app_css(self) -> None:
+        p = dict(PALETTES.get(self.palette_name, TOKYO)); p["accent"] = self.custom_accent or p["accent"]
+        css = CSS
+        for key, value in p.items(): css = css.replace(f"@{key.upper()}@", value)
+        self.provider.load_from_data(css.encode())
+
+    def page(self, title: str, subtitle: str) -> Gtk.Box:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        box.set_margin_top(28); box.set_margin_bottom(28); box.set_margin_start(30); box.set_margin_end(30)
+        heading = Gtk.Label(); heading.set_markup(f'<span size="24000" weight="bold">{title}</span>\n<span alpha="75%">{subtitle}</span>'); heading.set_xalign(0); heading.set_margin_bottom(12)
+        box.pack_start(heading, False, False, 0)
+        return box
+
+    def card(self, parent: Gtk.Box, title: str, desc: str, action: str | None = None, callback=None) -> Gtk.Box:
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16); row.set_margin_top(6); row.set_margin_bottom(6)
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3); text.set_hexpand(True)
+        a = Gtk.Label(label=title, xalign=0); a.set_markup(f"<b>{title}</b>")
+        b = Gtk.Label(label=desc, xalign=0, wrap=True); b.get_style_context().add_class("dim-label")
+        text.pack_start(a, False, False, 0); text.pack_start(b, False, False, 0); row.pack_start(text, True, True, 0)
+        if action:
+            button = Gtk.Button(label=action); button.connect("clicked", lambda _b: callback() if callback else None); row.pack_end(button, False, False, 0)
+        parent.pack_start(row, False, False, 0); parent.pack_start(Gtk.Separator(), False, False, 3)
+        return row
+
+    def overview_page(self) -> Gtk.Widget:
+        box = self.page("Добро пожаловать", "Управляйте PhantomOS из одного окна")
+        self.card(box, "Режим рабочего стола", "Super+Tab переключает тайлинг и плавающий режим.", "Переключить", lambda: launch([str(HOME / ".local/bin/phantomosctl"), "toggle"]))
+        self.card(box, "Внешний вид", "Цветовые схемы, акцент и плотность окон.", "Открыть", lambda: self.stack.set_visible_child_name("appearance"))
+        self.card(box, "Быстрые клавиши", "Super+D — Пуск · Super+I — настройки · Super+Enter — терминал.")
+        return box
+
+    def appearance_page(self) -> Gtk.Widget:
+        box = self.page("Внешний вид", "Выберите готовую палитру или задайте собственный акцент")
+        frame = Gtk.Frame(label="Цветовая схема"); inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12); inner.set_margin_top(10); inner.set_margin_bottom(10); inner.set_margin_start(12); inner.set_margin_end(12); frame.add(inner); box.pack_start(frame, False, False, 0)
+        combo = Gtk.ComboBoxText()
+        for name in PALETTES: combo.append_text(name)
+        combo.set_active(list(PALETTES).index(self.palette_name) if self.palette_name in PALETTES else 0)
+        inner.pack_start(combo, False, False, 0)
+        swatches = Gtk.Label(xalign=0); inner.pack_start(swatches, False, False, 0)
+        def preview(*_):
+            name = combo.get_active_text() or "Tokyo Night"; colors = PALETTES[name]
+            swatches.set_markup("   ".join(f'<span foreground="{colors[k]}">●</span>' for k in ("accent", "purple", "cyan", "green", "yellow", "magenta")))
+        preview(); combo.connect("changed", preview)
+        self.card(box, "Применить палитру", "Обновит это окно, Waybar, меню приложений и рамку активного окна.", "Применить", lambda: self.select_theme(combo.get_active_text()))
+        frame2 = Gtk.Frame(label="Свой акцентный цвет"); row = Gtk.Box(spacing=12); row.set_margin_top(12); row.set_margin_bottom(12); row.set_margin_start(12); row.set_margin_end(12); frame2.add(row); box.pack_start(frame2, False, False, 0)
+        row.pack_start(Gtk.Label(label="Цвет выделения", xalign=0), True, True, 0)
+        color = Gtk.ColorButton(); color.set_use_alpha(False)
+        initial = Gdk.RGBA(); initial.parse(self.custom_accent or PALETTES.get(self.palette_name, TOKYO)["accent"]); color.set_rgba(initial); row.pack_end(color, False, False, 0)
+        apply_color = Gtk.Button(label="Применить цвет")
+        def custom():
+            rgba = color.get_rgba(); value = "#%02x%02x%02x" % (round(rgba.red*255), round(rgba.green*255), round(rgba.blue*255))
+            self.custom_accent = value; apply_palette(self.palette_name, value); self.apply_app_css()
+        apply_color.connect("clicked", lambda _b: custom()); row.pack_end(apply_color, False, False, 0)
+        self.card(box, "Скругление окон", "Профили строгости отдельно запоминаются для Работы и Отдыха.", "Настроить", lambda: self.radius_dialog())
+        self.card(box, "Обои", "Выбрать фон рабочего стола и экрана блокировки.", "Выбрать", lambda: launch([str(HOME / ".local/bin/phantomosctl"), "wallpaper"]))
+        self.card(box, "GTK и Qt приложения", "Расширенные параметры оформления совместимых программ.", "Открыть GTK", lambda: launch(["nwg-look"]))
+        return box
+
+    def select_theme(self, name: str | None) -> None:
+        if not name: return
+        self.palette_name = name; self.custom_accent = ""; apply_palette(name); self.apply_app_css(); notify(f"Применена тема {name}")
+
+    def radius_dialog(self) -> None:
+        dialog = Gtk.Dialog(title="Скругление окон", transient_for=self, flags=0); dialog.add_button("Отмена", Gtk.ResponseType.CANCEL); dialog.add_button("Сохранить", Gtk.ResponseType.OK)
+        content = dialog.get_content_area(); content.set_spacing(10); content.set_margin_top(14); content.set_margin_bottom(14); content.set_margin_start(18); content.set_margin_end(18)
+        controls = {}
+        for mode, label, default in (("work", "Работа · более строгие", 9), ("relax", "Отдых · мягкие", 17)):
+            row = Gtk.Box(spacing=12); row.pack_start(Gtk.Label(label=label, xalign=0), True, True, 0)
+            scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 30, 1); scale.set_value(float(setting("rounding-"+mode, str(default)))); scale.set_size_request(250, -1); row.pack_end(scale, False, False, 0); content.pack_start(row, False, False, 0); controls[mode] = scale
+        dialog.show_all()
+        if dialog.run() == Gtk.ResponseType.OK:
+            for mode, scale in controls.items(): save("rounding-"+mode, str(int(scale.get_value())))
+            try:
+                mode_file = STATE / "phantomos/mode"
+                active_mode = mode_file.read_text(encoding="utf-8").strip() if mode_file.exists() else "work"
+                work = int(controls["work"].get_value()); relax = int(controls["relax"].get_value())
+                active = relax if active_mode == "relax" else work
+                expressions = [
+                    "PhantomOS.rounding = PhantomOS.rounding or {}",
+                    f"PhantomOS.rounding.work = {work}",
+                    f"PhantomOS.rounding.relax = {relax}",
+                    f"hl.config({{ decoration = {{ rounding = {active} }} }})",
+                ]
+                for expression in expressions:
+                    subprocess.run(["hyprctl", "eval", expression], capture_output=True)
+            except OSError: pass
+        dialog.destroy()
+
+    def display_page(self) -> Gtk.Widget:
+        box = self.page("Дисплеи", "Разрешение, частота, расположение и масштабирование")
+        for monitor in self.monitors(): self.card(box, monitor, "Текущий подключённый экран", "Настроить", lambda: launch(["nwg-displays"]))
+        self.card(box, "Расположение экранов", "Перетаскивайте мониторы, чтобы задать их взаимное положение.", "Настроить дисплеи", lambda: launch(["nwg-displays"]))
+        return box
+
+    @staticmethod
+    def monitors() -> list[str]:
+        try:
+            data = json.loads(subprocess.check_output(["hyprctl", "-j", "monitors"], text=True))
+            return [f'{x["name"]} · {x.get("width")}×{x.get("height")} @ {x.get("refreshRate", 0):.0f} Гц' for x in data]
+        except Exception: return ["Мониторы появятся после запуска Hyprland"]
+
+    def sound_page(self) -> Gtk.Widget:
+        box = self.page("Звук", "Устройства, уровни громкости и обработка аудио")
+        try:
+            result = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"], text=True, stderr=subprocess.DEVNULL)
+            initial = float(result.split()[1]) * 100
+        except (OSError, subprocess.CalledProcessError, ValueError, IndexError):
+            initial = 50
+        volume_row = Gtk.Box(spacing=14); volume_row.pack_start(Gtk.Label(label="Громкость системы", xalign=0), True, True, 0)
+        volume = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 150, 1); volume.set_value(initial); volume.set_size_request(280, -1); volume_row.pack_end(volume, False, False, 0)
+        box.pack_start(volume_row, False, False, 0)
+        self.card(box, "Уровень громкости", "Изменяет громкость выхода по умолчанию.", "Применить", lambda: self.set_volume(volume.get_value()))
+        self.card(box, "Отключить / включить звук", "Быстро переключает mute основного выхода.", "Переключить", lambda: subprocess.Popen(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]))
+        self.card(box, "Микшер громкости", "Выходы, входы, приложения и уровень звука.", "Открыть микшер", lambda: launch(["pavucontrol"]))
+        self.card(box, "Эквалайзер и эффекты", "Параметрический эквалайзер, компрессор и фильтры EasyEffects.", "Открыть EasyEffects", lambda: launch(["easyeffects"]))
+        self.card(box, "Выход по умолчанию", "Быстрый выбор активного аудиоустройства.", "Устройства", lambda: launch(["pavucontrol"]))
+        return box
+
+    @staticmethod
+    def set_volume(value: float) -> None:
+        result = subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{value / 100:.2f}"], capture_output=True)
+        if result.returncode == 0:
+            notify(f"Громкость: {round(value)}%")
+        else:
+            notify("Не удалось изменить громкость. Проверьте, что PipeWire запущен.")
+
+    def input_page(self) -> Gtk.Widget:
+        box = self.page("Устройства ввода", "Мышь, раскладки и комбинации клавиш")
+        sensitivity = float(setting("mouse-sensitivity", "0") or 0)
+        row = Gtk.Box(spacing=14); row.pack_start(Gtk.Label(label="Чувствительность мыши", xalign=0), True, True, 0)
+        scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, -1, 1, .05); scale.set_value(sensitivity); scale.set_size_request(270, -1); row.pack_end(scale, False, False, 0); box.pack_start(row, False, False, 0)
+        self.card(box, "Чувствительность указателя", "Текущее значение применяется после нажатия кнопки.", "Применить", lambda: self.set_sensitivity(scale.get_value()))
+        self.card(box, "Раскладки клавиатуры", f"Сейчас: {setting('keyboard-layouts', 'us,ru')} · переключение Ctrl+Shift.", "Добавить / убрать", lambda: self.layout_dialog())
+        self.card(box, "Жесты и правила устройств", "Дополнительные параметры указателя Hyprland.", "Открыть конфиг", lambda: launch(["code", str(CONFIG / "hypr/phantomos/theme.lua")], ["micro", str(CONFIG / "hypr/phantomos/theme.lua")]))
+        return box
+
+    @staticmethod
+    def set_sensitivity(value: float) -> None:
+        v = f"{value:.2f}"; save("mouse-sensitivity", v)
+        subprocess.run(["hyprctl", "eval", f"hl.config({{ input = {{ sensitivity = {v} }} }})"], capture_output=True)
+
+    def layout_dialog(self) -> None:
+        known = {"English (US)":"us", "Русский":"ru", "Українська":"ua", "Deutsch":"de", "Français":"fr", "Español":"es", "Italiano":"it", "Polski":"pl", "Türkçe":"tr", "日本語":"jp"}
+        current = setting("keyboard-layouts", "us,ru").split(","); dialog = Gtk.Dialog(title="Раскладки · Ctrl+Shift", transient_for=self, flags=0); dialog.add_button("Отмена", Gtk.ResponseType.CANCEL); dialog.add_button("Сохранить", Gtk.ResponseType.OK)
+        area = dialog.get_content_area(); area.set_spacing(5); checks = {}
+        for label, code in known.items():
+            check = Gtk.CheckButton(label=label); check.set_active(code in current); area.pack_start(check, False, False, 0); checks[code] = check
+        dialog.show_all()
+        if dialog.run() == Gtk.ResponseType.OK:
+            chosen = [code for code, check in checks.items() if check.get_active()] or ["us"]
+            save("keyboard-layouts", ",".join(chosen)); subprocess.run(["hyprctl", "eval", f'hl.config({{ input = {{ kb_layout = "{",".join(chosen)}", kb_options = "grp:ctrl_shift_toggle" }} }})'], capture_output=True)
+        dialog.destroy()
+
+    def network_page(self) -> Gtk.Widget:
+        box = self.page("Сеть и Bluetooth", "Управление подключениями и беспроводными устройствами")
+        self.card(box, "Сетевые подключения", "Wi-Fi, Ethernet, VPN и сохранённые сети.", "Открыть", lambda: launch(["nm-connection-editor"]))
+        self.card(box, "Bluetooth", "Подключение наушников, контроллеров и других устройств.", "Открыть", lambda: launch(["blueman-manager"]))
+        return box
+
+    def system_page(self) -> Gtk.Widget:
+        box = self.page("Система", "Базовые действия и дополнительные системные панели")
+        self.card(box, "Режим рабочего стола", "Работа с тайлингом или Отдых с плавающими окнами.", "Переключить", lambda: launch([str(HOME / ".local/bin/phantomosctl"), "toggle"]))
+        self.card(box, "Питание", "Блокировка, выход из сессии, перезагрузка и выключение.", "Открыть", lambda: launch([str(HOME / ".local/bin/phantomosctl"), "power"]))
+        self.card(box, "Расширенные настройки GTK", "Внешний вид приложений GTK.", "Открыть", lambda: launch(["nwg-look"]))
+        self.card(box, "Расширенные настройки Qt", "Внешний вид приложений Qt.", "Открыть", lambda: launch(["qt6ct"]))
+        return box
+
+
+if __name__ == "__main__":
+    app = SettingsWindow(); app.connect("destroy", Gtk.main_quit); app.show_all(); Gtk.main()

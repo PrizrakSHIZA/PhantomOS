@@ -141,7 +141,7 @@ local function apply_visual_profile(value)
     if value == "relax" then
         hl.config({
             general = { gaps_in = 10, gaps_out = 16, border_size = 1 },
-            decoration = { rounding = 17, rounding_power = 2.6 },
+            decoration = { rounding = (PhantomOS.rounding and PhantomOS.rounding.relax) or 17, rounding_power = 2.6 },
         })
         hl.animation({ leaf = "windows", enabled = true, speed = 7, curve = "phantomSoft", style = "popin 88%" })
         hl.animation({ leaf = "layers", enabled = true, speed = 5, curve = "phantomSoft", style = "fade" })
@@ -149,7 +149,7 @@ local function apply_visual_profile(value)
     else
         hl.config({
             general = { gaps_in = 7, gaps_out = 12, border_size = 2, layout = "dwindle" },
-            decoration = { rounding = 9, rounding_power = 2 },
+            decoration = { rounding = (PhantomOS.rounding and PhantomOS.rounding.work) or 9, rounding_power = 2 },
         })
         hl.animation({ leaf = "windows", enabled = true, speed = 5, curve = "phantomSoft", style = "popin 92%" })
         hl.animation({ leaf = "layers", enabled = true, speed = 4, curve = "phantomSoft", style = "fade" })
