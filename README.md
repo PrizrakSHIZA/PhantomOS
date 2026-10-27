@@ -1,47 +1,68 @@
-﻿# PhantomOS
+# PhantomOS
 
-Personal Arch Linux desktop configuration built around Hyprland. The goal is a reproducible setup with two desktop modes and a Tokyo Night / Dracula inspired visual identity.
+Личный конфигурационный набор Arch Linux с Hyprland. PhantomOS добавляет два режима рабочего стола, единое оформление и повторяемую установку поверх уже установленного Arch.
 
-## Desktop modes
+## Режимы
 
-### Work
+**Работа** — динамический тайлинг dwindle, рабочие столы 1–5 на левом экране и 6–10 на правом, компактная верхняя панель без списка открытых окон. Super+Enter запускает Kitty, Super+1…5 переключает рабочие столы текущего монитора.
 
-- Hyprland dynamic tiling, initially using the `dwindle` layout.
-- Multiple workspaces per monitor with keyboard navigation.
-- Compact top panel on each connected display; show workspaces and system status, but no running-window task list.
-- `Super+Enter` opens a terminal, which joins the current tiling layout.
-- Strict window corners and a restrained animation profile.
+**Отдых** — окна обоих экранов сводятся на один рабочий стол каждого монитора и становятся плавающими. На левом экране панель слева, на остальных справа; она показывает иконки приложений текущего рабочего стола. Возврат в режим работы восстанавливает прежние рабочие столы и исходное состояние плавающих окон.
 
-### Relax
+Super+Tab переключает режим. На панели есть кнопка режима, меню приложений, настройки и питание.
 
-- Floating windows with familiar move, resize, maximize and focus behavior.
-- Left-side panel on the left display and right-side panel on the right display; show that monitor's open windows.
-- One workspace per monitor.
-- Softer corners and gentler animations.
+## Оформление
 
-### Switching
+Tokyo Night с фиолетовыми акцентами: скруглённые панели, неброский blur, активная синяя рамка и плавные переходы. Палитру и стили можно менять в:
 
-- `Super+Tab` is the primary mode toggle.
-- The same action will be exposed as a panel button and from the PhantomOS application menu.
-- A single mode controller will update the compositor state, panel layout, workspace policy and visual profile together.
+- waybar/style.css
+- rofi/phantomos.rasi
+- kitty/kitty.conf
+- hypr/phantomos/theme.lua
 
-## Initial architecture
+В репозитории есть авторские обои PhantomOS; установщик включает их в оформление рабочего стола и экрана блокировки. Дисплеи настраиваются через nwg-displays из меню настроек. Его настройки мониторов и рабочих столов подхватываются Hyprland при следующем запуске.
 
-- **Hyprland (Lua):** compositor, window layout, monitor configuration, key bindings, and window rules.
-- **Quickshell (QML):** PhantomOS panels, Windows-inspired application menu, mode toggle, and a small quick-settings surface.
-- **Native Linux tools:** file picker, notifications, network/audio controls, lock and power actions. PhantomOS UI will launch and theme established system components where possible instead of rebuilding their backend behavior.
-- **Dotfiles and installer:** package manifest, configuration templates, backup-aware install script, and optional app bundles such as `micro`, VS Code, and Python.
+## Установка
 
-The installer should support both one-monitor and two-monitor systems, discover connected outputs at runtime, and keep hardware-specific settings out of the shared defaults. Monitor names, resolutions and refresh rates will be confirmed on the target Arch installation.
+Требуется Arch Linux и Hyprland 0.55 или новее (Lua-конфигурация). Установщик не меняет драйвер NVIDIA, загрузчик и системную конфигурацию.
 
-## First milestone
+    git clone https://github.com/PrizrakSHIZA/PhantomOS.git
+    cd PhantomOS
+    ./install.sh
 
-1. Confirm the Arch base and NVIDIA driver setup.
-2. Bring up a minimal Hyprland session and verify both monitors, refresh rates, sleep/wake, screenshots and common applications.
-3. Add mode switching and workspace behavior.
-4. Build the two panel layouts and app menu.
-5. Package the known-good configuration into a repeatable, backup-aware installer.
+Установщик поставит пакеты через pacman, сохранит существующие настройки Hyprland и установит конфигурацию PhantomOS. Если пакеты уже установлены отдельно:
 
-## Design notes
+    ./install.sh --no-packages
 
-This repository configures a personal desktop on Arch; it is not a new Linux distribution or a replacement for KDE System Settings. PhantomOS will provide a consistent branded shell for frequent actions and leave deeper device configuration to the native applications. The UI should remain usable with one display and should degrade gracefully when optional tools are absent.
+После установки выйди из сессии и снова выбери Hyprland. Первый запуск создаст панели для подключённых экранов. При одном мониторе будет одна панель; при двух мониторах в режиме отдыха панели разместятся по внешним краям.
+
+### Резервные копии
+
+Перед заменой существующего Hyprland-конфига установщик копирует его в ~/.local/share/phantomos/backups/ДАТА-ВРЕМЯ/. Настройки Waybar, Rofi и Kitty также сохраняются отдельно перед заменой.
+
+## Управление
+
+- Super+Tab — переключить Работа / Отдых.
+- Super+D — меню приложений.
+- Super+I — меню настроек PhantomOS.
+- Super+Enter — терминал.
+- Super+1…5 — рабочий стол на текущем мониторе; в режиме отдыха остаётся один.
+- Super+Shift+1…5 — переместить окно на рабочий стол в режиме работы.
+- Super+H/J/K/L — фокус окна; Super+Shift+H/J/K/L — переместить окно.
+- Super+V — переключить плавающий режим активного окна.
+- Print — область экрана; Super+Print — весь экран.
+
+Установщик ставит Kitty, micro, Python и VS Code (пакет code) вместе с основным окружением. Звук доступен в pavucontrol. Сеть и Bluetooth откроются из меню настроек, если соответствующие утилиты уже есть в системе. Глубокие настройки Hyprland доступны через конфигурацию в ~/.config/hypr/phantomos/.
+
+## Структура
+
+- hypr/ — точка входа и Lua-модули Hyprland.
+- bin/phantomosctl — меню, управление панелями и вывод состояния.
+- waybar/ — оформление рабочих панелей.
+- rofi/ — меню приложений и быстрые действия.
+- kitty/ — Tokyo Night конфигурация терминала.
+- assets/ — генератор и PNG-обои PhantomOS.
+- install.sh — post-install установщик Arch.
+
+## NVIDIA и проверка на устройстве
+
+Твой Hyprland уже запускался на RTX 4060, поэтому установщик не меняет драйвер. После применения PhantomOS на целевой системе отдельно проверь переключение режима с обычными окнами и диалогами, сон/пробуждение, снимки экрана и игры. Wayland и NVIDIA меняются, а конфигурацию мониторов нужно сверить по именам и режимам, которые покажет hyprctl monitors.

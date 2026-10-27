@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""PhantomOS session helper: mode controls, Waybar profiles, and small menus."""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+HOME_DIR = Path.home()
+CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME_DIR / ".config"))
+STATE_HOME = Path(os.environ.get("XDG_STATE_HOME", HOME_DIR / ".local/state"))
+PHANTOM_CONFIG = CONFIG_HOME / "phantomos"
+MODE_FILE = STATE_HOME / "phantomos" / "mode"
+WAYBAR_CONFIG = PHANTOM_CONFIG / "waybar.json"
+WAYBAR_STYLE = CONFIG_HOME / "waybar" / "phantomos.css"
+ROFI_THEME = CONFIG_HOME / "rofi" / "phantomos.rasi"
+
+
+def current_mode() -> str:
+    try:
+        return "relax" if MODE_FILE.read_text(encoding="utf-8").strip() == "relax" else "work"
+    except OSError:
+        return "work"
+
+
+def run_checked(command: list[str]) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(command, check=True, text=True, capture_output=True)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Не найдена команда: {command[0]}") from error
+    except subprocess.CalledProcessError as error:
+        details = error.stderr.strip() or error.stdout.strip() or str(error)
+        raise RuntimeError(details) from error
+
+
+def outputs() -> list[dict[str, Any]]:
+    try:
+        result = run_checked(["hyprctl", "-j", "monitors"])
+        values = json.loads(result.stdout)
+        return sorted(values, key=lambda monitor: (monitor.get("x", 0), monitor.get("y", 0)))
+    except (RuntimeError, json.JSONDecodeError):
+        return []
+
+
+def command_path() -> str:
+    return str(HOME_DIR / ".local/bin/phantomosctl")
+
+
+def workspaces_module(mode: str, ctl: str) -> dict[str, Any]:
+    module: dict[str, Any] = {
+        "format": "{name}" if mode == "work" else "{windows}",
+        "all-outputs": False,
+        "sort-by-id": True,
+        "active-only": mode == "relax",
+        "persistent-only": mode == "work",
+        "workspace-taskbar": {
+            "enable": mode == "relax",
+            "update-active-window": True,
+            "icon-size": 22,
+            "format": "{icon}",
+            "on-click-window": f"{ctl} focus-window {{address}}",
+        },
+    }
+    return module
+
+
+def waybar_bar(mode: str, ctl: str, output: str | None = None, side: str = "left") -> dict[str, Any]:
+    relax = mode == "relax"
+    bar: dict[str, Any] = {
+        "name": "phantom-relax" if relax else "phantom-work",
+        "layer": "top",
+        "position": side if relax else "top",
+        "margin": 0,
+        "spacing": 4,
+        "modules-left": ["custom/start"] if relax else ["custom/start", "hyprland/workspaces"],
+        "modules-center": ["hyprland/workspaces"] if relax else ["custom/mode"],
+        "modules-right": (
+            ["custom/mode", "pulseaudio", "network", "clock", "tray", "custom/settings", "custom/power"]
+            if relax
+            else ["pulseaudio", "network", "clock", "tray", "custom/settings", "custom/power"]
+        ),
+        "custom/start": {
+            "format": "◈",
+            "tooltip": "PhantomOS — меню приложений",
+            "on-click": f"{ctl} menu",
+        },
+        "custom/mode": {
+            "exec": f"{ctl} mode-indicator" + (" compact" if relax else ""),
+            "return-type": "json",
+            "format": "{text}",
+            "interval": 2,
+            "on-click": f"{ctl} toggle",
+            "tooltip": True,
+        },
+        "custom/settings": {
+            "format": "⚙",
+            "tooltip": "Настройки PhantomOS",
+            "on-click": f"{ctl} settings",
+        },
+        "custom/power": {
+            "format": "⏻",
+            "tooltip": "Питание",
+            "on-click": f"{ctl} power",
+        },
+        "hyprland/workspaces": workspaces_module(mode, ctl),
+        "pulseaudio": {
+            "format": "{volume}% {icon}",
+            "format-muted": "󰝟",
+            "format-icons": ["󰕿", "󰖀", "󰕾"],
+            "on-click": "pavucontrol",
+            "scroll-step": 5,
+        },
+        "network": {
+            "format-wifi": " {signalStrength}%",
+            "format-ethernet": "󰈀",
+            "format-disconnected": "󰖪",
+            "tooltip-format": "{ifname}: {ipaddr}",
+            "on-click": "nm-connection-editor",
+        },
+        "clock": {
+            "format": "{:%a %d %b  %H:%M}",
+            "tooltip-format": "<tt>{calendar}</tt>",
+        },
+        "tray": {"spacing": 8, "icon-size": 16},
+    }
+
+    if relax:
+        bar["width"] = 62
+        bar["hyprland/workspaces"]["format"] = "{windows}"
+        bar["pulseaudio"]["format"] = "{icon}"
+        bar["network"]["format-wifi"] = ""
+        bar["network"]["format-ethernet"] = "󰈀"
+        bar["clock"]["format"] = "{:%H:%M}"
+    else:
+        bar["height"] = 38
+
+    if output:
+        bar["output"] = output
+        bar["name"] = f"phantom-relax-{output}"
+    return bar
+
+
+def generate_waybar() -> None:
+    PHANTOM_CONFIG.mkdir(parents=True, exist_ok=True)
+    active_mode = current_mode()
+    ctl = command_path()
+    screens = outputs()
+
+    if active_mode == "work" or not screens:
+        config = [waybar_bar("work", ctl)]
+    else:
+        config = []
+        for index, screen in enumerate(screens):
+            side = "left" if index == 0 else "right"
+            config.append(waybar_bar("relax", ctl, screen["name"], side))
+
+    WAYBAR_CONFIG.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def start_panels() -> None:
+    generate_waybar()
+    if shutil.which("waybar") is None:
+        raise RuntimeError("Waybar не установлен. Запусти install.sh в каталоге PhantomOS.")
+    subprocess.run(["pkill", "-x", "waybar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(0.25)
+    log_path = STATE_HOME / "phantomos" / "waybar.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_file = log_path.open("ab")
+    subprocess.Popen(
+        ["waybar", "--config", str(WAYBAR_CONFIG), "--style", str(WAYBAR_STYLE)],
+        stdin=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    log_file.close()
+
+
+def run_rofi(args: list[str]) -> str:
+    if shutil.which("rofi") is None:
+        raise RuntimeError("Rofi не установлен. Запусти install.sh в каталоге PhantomOS.")
+    result = subprocess.run(
+        ["rofi", *args, "-theme", str(ROFI_THEME)],
+        input=None,
+        text=True,
+        capture_output=True,
+    )
+    return result.stdout.strip()
+
+
+def dmenu(prompt: str, choices: list[str]) -> str:
+    if shutil.which("rofi") is None:
+        raise RuntimeError("Rofi не установлен.")
+    result = subprocess.run(
+        ["rofi", "-dmenu", "-i", "-p", prompt, "-theme", str(ROFI_THEME)],
+        input="\n".join(choices) + "\n",
+        text=True,
+        capture_output=True,
+    )
+    return result.stdout.strip()
+
+
+def launch(command: list[str]) -> None:
+    try:
+        subprocess.Popen(command, start_new_session=True)
+    except FileNotFoundError:
+        notify(f"Команда не найдена: {command[0]}")
+
+
+def notify(message: str) -> None:
+    if shutil.which("notify-send"):
+        subprocess.Popen(
+            ["notify-send", "--app-name=PhantomOS", "PhantomOS", message],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+def open_menu() -> None:
+    run_rofi(["-show", "drun", "-show-icons"])
+
+
+def open_settings() -> None:
+    choices = [
+        "Дисплеи",
+        "Аудио",
+        "Редактировать конфигурацию Hyprland",
+        "Открыть папку настроек",
+    ]
+    if shutil.which("nm-connection-editor"):
+        choices.append("Сеть")
+    if shutil.which("blueman-manager"):
+        choices.append("Bluetooth")
+
+    selected = dmenu("PhantomOS · Настройки", choices)
+    if selected == "Дисплеи":
+        launch(["nwg-displays"])
+    elif selected == "Аудио":
+        launch(["pavucontrol"])
+    elif selected == "Редактировать конфигурацию Hyprland":
+        launch(["kitty", "micro", str(CONFIG_HOME / "hypr" / "phantomos" / "mode.lua")])
+    elif selected == "Открыть папку настроек":
+        launch(["thunar", str(CONFIG_HOME / "hypr" / "phantomos")])
+    elif selected == "Сеть":
+        launch(["nm-connection-editor"])
+    elif selected == "Bluetooth":
+        launch(["blueman-manager"])
+
+
+def open_power_menu() -> None:
+    choices = ["Заблокировать", "Приостановить", "Выйти из PhantomOS", "Перезагрузить", "Выключить"]
+    selected = dmenu("PhantomOS · Питание", choices)
+    actions = {
+        "Заблокировать": ["hyprlock"],
+        "Приостановить": ["systemctl", "suspend"],
+        "Выйти из PhantomOS": ["hyprctl", "dispatch", "exit"],
+        "Перезагрузить": ["systemctl", "reboot"],
+        "Выключить": ["systemctl", "poweroff"],
+    }
+    if selected in actions:
+        launch(actions[selected])
+
+
+def focus_window(address: str) -> None:
+    if not address.startswith("0x") or any(char not in "0123456789abcdefABCDEFx" for char in address):
+        raise RuntimeError("Неверный адрес окна.")
+    expression = f'hl.dispatch(hl.dsp.focus({{ window = "address:{address}" }}))'
+    run_checked(["hyprctl", "eval", expression])
+
+
+def toggle_mode() -> None:
+    run_checked(["hyprctl", "eval", "PhantomOS.toggle_mode()"])
+
+
+def print_mode_indicator(compact: bool = False) -> None:
+    active_mode = current_mode()
+    if compact:
+        text_value = "▰" if active_mode == "work" else "◉"
+    else:
+        text_value = "▰  РАБОТА" if active_mode == "work" else "◉  ОТДЫХ"
+    payload = {
+        "text": text_value,
+        "class": active_mode,
+        "tooltip": "Super+Tab — переключить режим",
+    }
+    # Escaped Unicode remains valid JSON and works in non-UTF-8 test shells too.
+    print(json.dumps(payload, ensure_ascii=True))
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("Usage: phantomosctl {menu|settings|power|toggle|mode-indicator|refresh-panels|focus-window ADDRESS}")
+        return 2
+
+    action = sys.argv[1]
+    try:
+        if action == "menu":
+            open_menu()
+        elif action == "settings":
+            open_settings()
+        elif action == "power":
+            open_power_menu()
+        elif action == "toggle":
+            toggle_mode()
+        elif action == "mode-indicator":
+            print_mode_indicator(compact="compact" in sys.argv[2:])
+        elif action == "refresh-panels":
+            start_panels()
+        elif action == "focus-window" and len(sys.argv) == 3:
+            focus_window(sys.argv[2])
+        elif action == "show-mode":
+            print(current_mode())
+        else:
+            print(f"Неизвестная команда: {action}", file=sys.stderr)
+            return 2
+    except (RuntimeError, OSError) as error:
+        notify(str(error))
+        print(f"phantomosctl: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
