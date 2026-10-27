@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""PhantomOS command hub and temporary-checkout updater."""
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+from pathlib import Path
+
+
+REPOSITORY = "https://github.com/PrizrakSHIZA/PhantomOS.git"
+BRANCH = "main"
+HOME = Path.home()
+CTL = HOME / ".local/bin/phantomosctl"
+
+
+def usage() -> None:
+    print("""PhantomOS command hub
+
+Usage: phantom <command>
+  update               Download the latest PhantomOS and install it
+  mode                 Show the current desktop mode
+  toggle               Switch Work / Relax mode
+  work | relax         Select a desktop mode
+  settings             Open PhantomOS Settings
+  menu                 Open the application menu
+  power                Open power actions
+  wallpaper            Choose a desktop wallpaper
+  help                 Show this help
+
+`phantom update` updates PhantomOS configuration only.""")
+
+
+def run_ctl(action: str) -> int:
+    if not CTL.exists():
+        print("phantom: phantomosctl is missing; rerun install.sh", file=sys.stderr)
+        return 1
+    result = subprocess.run([str(CTL), action])
+    return result.returncode
+
+
+def update() -> int:
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gdk, GLib, Gtk
+    except (ImportError, ValueError) as error:
+        print(f"phantom: GTK 3 is needed for the update screen: {error}", file=sys.stderr)
+        return 1
+
+    class UpdateWindow(Gtk.Window):
+        def __init__(self) -> None:
+            super().__init__(title="PhantomOS Update")
+            self.set_decorated(False)
+            self.set_keep_above(True)
+            self.set_modal(True)
+            self.set_position(Gtk.WindowPosition.CENTER)
+            self.fullscreen()
+            self.get_style_context().add_class("phantom-update")
+            self.provider = Gtk.CssProvider()
+            colors = self.read_theme_colors()
+            css = f"""
+                window.phantom-update {{ background: {colors['base']}; color: {colors['text']}; }}
+                label {{ color: {colors['text']}; }}
+                label.dim-label {{ color: {colors['subtext']}; }}
+                progressbar trough {{ background: {colors['surface2']}; border-radius: 10px; min-height: 18px; }}
+                progressbar progress {{ background: {colors['accent']}; border-radius: 10px; }}
+                button {{ color: {colors['text']}; background: {colors['surface']}; border: 1px solid {colors['accent']}; border-radius: 10px; padding: 10px 24px; }}
+            """
+            self.provider.load_from_data(css.encode("utf-8"))
+            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self.provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            self.finished = False
+            self.result = 1
+            self.set_border_width(40)
+            outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
+            outer.set_halign(Gtk.Align.CENTER)
+            outer.set_valign(Gtk.Align.CENTER)
+            outer.set_size_request(600, -1)
+            self.add(outer)
+            title = Gtk.Label()
+            title.set_markup('<span size="30000" weight="bold">PHANTOMOS</span>\n<span size="18000">Обновление PhantomOS</span>')
+            outer.pack_start(title, False, False, 0)
+            self.spinner = Gtk.Spinner()
+            self.spinner.set_size_request(64, 64)
+            outer.pack_start(self.spinner, False, False, 0)
+            self.status = Gtk.Label(label="Подготовка…")
+            self.status.set_line_wrap(True)
+            outer.pack_start(self.status, False, False, 0)
+            self.progress = Gtk.ProgressBar()
+            self.progress.set_show_text(True)
+            outer.pack_start(self.progress, False, False, 0)
+            self.detail = Gtk.Label(label="Загружаются файлы PhantomOS")
+            self.detail.get_style_context().add_class("dim-label")
+            outer.pack_start(self.detail, False, False, 0)
+            self.close_button = Gtk.Button(label="Закрыть")
+            self.close_button.set_halign(Gtk.Align.CENTER)
+            self.close_button.set_no_show_all(True)
+            self.close_button.connect("clicked", lambda _button: Gtk.main_quit())
+            outer.pack_start(self.close_button, False, False, 0)
+            self.connect("delete-event", self.on_delete)
+            self.show_all()
+            self.close_button.hide()
+            self.spinner.start()
+            threading.Thread(target=self.worker, daemon=True).start()
+
+        @staticmethod
+        def read_theme_colors() -> dict[str, str]:
+            defaults = {"base": "#1a1b26", "surface": "#24283b", "surface2": "#343b58", "text": "#c0caf5", "subtext": "#a9b1d6", "accent": "#7aa2f7"}
+            stylesheet = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "waybar/phantomos.css"
+            try:
+                content = stylesheet.read_text(encoding="utf-8")
+            except OSError:
+                return defaults
+            names = {"base": "base", "surface": "surface", "surface2": "surface2", "text": "text", "subtext": "subtext", "accent": "blue"}
+            for key, css_name in names.items():
+                match = re.search(rf"@define-color {css_name} (#[0-9a-fA-F]{{6}});", content)
+                if match:
+                    defaults[key] = match.group(1)
+            return defaults
+
+        def on_delete(self, *_args) -> bool:
+            return not self.finished
+
+        def set_stage(self, title: str, fraction: float, detail: str = "") -> bool:
+            self.status.set_text(title)
+            self.progress.set_fraction(fraction)
+            self.progress.set_text(f"{round(fraction * 100)}%")
+            if detail:
+                self.detail.set_text(detail)
+            return False
+
+        def finish(self, code: int, message: str, detail: str = "") -> bool:
+            self.result = code
+            self.finished = True
+            self.spinner.stop()
+            self.status.set_text(message)
+            self.progress.set_fraction(1 if code == 0 else self.progress.get_fraction())
+            if code == 0:
+                self.progress.set_text("Готово")
+                self.detail.set_text(detail or "PhantomOS обновлён. Резервные копии настроек сохранены.")
+            else:
+                self.progress.set_text("Ошибка")
+                self.detail.set_text(detail or "Подробности доступны в терминале, из которого запущена команда.")
+            self.close_button.show()
+            return False
+
+        def worker(self) -> None:
+            checkout: str | None = None
+            try:
+                GLib.idle_add(self.set_stage, "Подключаюсь к репозиторию…", 0.08, REPOSITORY)
+                checkout = tempfile.mkdtemp(prefix="phantomos-update-")
+                clone = subprocess.run(
+                    ["git", "clone", "--depth", "1", "--branch", BRANCH, REPOSITORY, checkout],
+                    text=True, capture_output=True, timeout=180,
+                )
+                if clone.returncode:
+                    raise RuntimeError((clone.stderr or clone.stdout or "git clone failed").strip()[-1400:])
+                revision = subprocess.run(
+                    ["git", "-C", checkout, "rev-parse", "--short", "HEAD"],
+                    text=True, capture_output=True, check=True,
+                ).stdout.strip()
+                GLib.idle_add(self.set_stage, "Проверяю обновление…", 0.48, f"Версия репозитория: {revision}")
+                command = ["bash", str(Path(checkout) / "install.sh"), "--no-packages"]
+                GLib.idle_add(self.set_stage, "Устанавливаю PhantomOS…", 0.70, "Настройки будут сохранены в резервную копию.")
+                install = subprocess.run(command, cwd=checkout, text=True, capture_output=True, timeout=120)
+                if install.returncode:
+                    details = (install.stderr or install.stdout or "install.sh failed").strip()[-1400:]
+                    raise RuntimeError(details)
+                GLib.idle_add(self.set_stage, "Завершаю установку…", 0.94, "Удаляю временную копию репозитория.")
+                GLib.idle_add(self.finish, 0, "Обновление завершено", f"Установлена версия {revision}. Временные файлы удаляются.")
+            except Exception as error:
+                print(f"phantom update: {error}", file=sys.stderr)
+                GLib.idle_add(self.finish, 1, "Не удалось обновить PhantomOS", str(error)[-1400:])
+            finally:
+                if checkout:
+                    shutil.rmtree(checkout, ignore_errors=True)
+
+    window = UpdateWindow()
+    window.connect("destroy", lambda _window: Gtk.main_quit())
+    Gtk.main()
+    return window.result
+
+
+def main(args: list[str]) -> int:
+    if not args or args[0] in ("help", "--help", "-h"):
+        usage()
+        return 0
+    command, *rest = args
+    if command == "update":
+        if rest:
+            print("phantom: update does not accept options", file=sys.stderr)
+            return 2
+        return update()
+    if rest:
+        print(f"phantom: {command} does not accept arguments", file=sys.stderr)
+        return 2
+    aliases = {"mode": "show-mode", "toggle": "toggle", "work": "set-work", "relax": "set-relax"}
+    if command in aliases:
+        if command in ("work", "relax"):
+            if not shutil.which("hyprctl"):
+                print("phantom: Hyprland is not running", file=sys.stderr)
+                return 1
+            return subprocess.run(["hyprctl", "eval", f'PhantomOS.set_mode("{command}")']).returncode
+        return run_ctl(aliases[command])
+    if command in {"settings", "menu", "power", "wallpaper"}:
+        return run_ctl(command)
+    print(f"phantom: unknown command: {command}", file=sys.stderr)
+    usage()
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

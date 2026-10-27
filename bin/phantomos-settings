@@ -164,6 +164,7 @@ class SettingsWindow(Gtk.Window):
 
     def overview_page(self) -> Gtk.Widget:
         box = self.page("Добро пожаловать", "Управляйте PhantomOS из одного окна")
+        self.card(box, "Обновление PhantomOS", "Загрузить актуальные настройки из репозитория и применить их.", "Проверить обновления", lambda: launch(["phantom", "update"]))
         self.card(box, "Режим рабочего стола", "Super+Tab переключает тайлинг и плавающий режим.", "Переключить", lambda: launch([str(HOME / ".local/bin/phantomosctl"), "toggle"]))
         self.card(box, "Внешний вид", "Цветовые схемы, акцент и плотность окон.", "Открыть", lambda: self.stack.set_visible_child_name("appearance"))
         self.card(box, "Быстрые клавиши", "Super+D — Пуск · Super+I — настройки · Super+Enter — терминал.")

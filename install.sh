@@ -40,7 +40,7 @@ if ((NO_PACKAGES == 0)); then
     command -v sudo >/dev/null 2>&1 || { echo 'Install sudo, then rerun ./install.sh.' >&2; exit 1; }
 
     packages=(
-        hyprland waybar rofi-wayland kitty micro python code gtk3 python-gobject
+        hyprland waybar rofi-wayland kitty micro python code gtk3 python-gobject git
         hyprpaper hyprlock swaync polkit-gnome pavucontrol easyeffects lsp-plugins-lv2
         nwg-displays nwg-look qt6ct kvantum zenity adw-gtk-theme pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber
         networkmanager network-manager-applet bluez bluez-utils blueman thunar
@@ -124,6 +124,7 @@ backup_and_install "$ROOT_DIR/rofi/phantomos.rasi" "$CONFIG_HOME/rofi/phantomos.
 backup_and_install "$ROOT_DIR/kitty/kitty.conf" "$CONFIG_HOME/kitty/phantomos.conf"
 backup_and_install "$ROOT_DIR/bin/phantomosctl" "$HOME/.local/bin/phantomosctl"
 backup_and_install "$ROOT_DIR/bin/phantomos-settings" "$HOME/.local/bin/phantomos-settings"
+backup_and_install "$ROOT_DIR/bin/phantom" "$HOME/.local/bin/phantom"
 backup_and_install "$ROOT_DIR/hypr/hyprpaper.conf" "$CONFIG_HOME/hypr/hyprpaper.conf"
 backup_and_install "$ROOT_DIR/hypr/hyprlock.conf" "$CONFIG_HOME/hypr/hyprlock.conf"
 backup_and_install "$ROOT_DIR/assets/phantomos-night.png" "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png"
@@ -131,6 +132,7 @@ backup_and_install "$ROOT_DIR/applications/phantomos-settings.desktop" "$HOME/.l
 backup_and_install "$ROOT_DIR/applications/phantomos-power.desktop" "$HOME/.local/share/applications/phantomos-power.desktop"
 chmod 0755 "$HOME/.local/bin/phantomosctl"
 chmod 0755 "$HOME/.local/bin/phantomos-settings"
+chmod 0755 "$HOME/.local/bin/phantom"
 
 if [[ ! -e "$CONFIG_HOME/kitty/kitty.conf" ]]; then
     printf 'include phantomos.conf\n' >"$CONFIG_HOME/kitty/kitty.conf"
