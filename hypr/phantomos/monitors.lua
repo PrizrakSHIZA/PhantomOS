@@ -1,8 +1,8 @@
--- Use preferred resolutions and each screen's highest available refresh rate.
--- Auto positioning handles a single display and left-to-right multi-monitor layouts.
+-- Use each display's preferred native resolution and refresh rate.
+-- `highrr` can choose a low-resolution mode if it exposes a higher refresh rate.
 hl.monitor({
     output = "",
-    mode = "highrr",
+    mode = "preferred",
     position = "auto",
-    scale = "auto",
+    scale = 1,
 })

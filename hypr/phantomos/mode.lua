@@ -143,17 +143,17 @@ local function apply_visual_profile(value)
             general = { gaps_in = 10, gaps_out = 16, border_size = 1 },
             decoration = { rounding = (PhantomOS.rounding and PhantomOS.rounding.relax) or 17, rounding_power = 2.6 },
         })
-        hl.animation({ leaf = "windows", enabled = true, speed = 7, curve = "phantomSoft", style = "popin 88%" })
-        hl.animation({ leaf = "layers", enabled = true, speed = 5, curve = "phantomSoft", style = "fade" })
-        hl.animation({ leaf = "workspaces", enabled = true, speed = 8, curve = "phantomSoft", style = "slidefade 24%" })
+        hl.animation({ leaf = "windows", enabled = true, speed = 7, bezier = "phantomSoft", style = "popin 88%" })
+        hl.animation({ leaf = "layers", enabled = true, speed = 5, bezier = "phantomSoft", style = "fade" })
+        hl.animation({ leaf = "workspaces", enabled = true, speed = 8, bezier = "phantomSoft", style = "slidefade 24%" })
     else
         hl.config({
             general = { gaps_in = 7, gaps_out = 12, border_size = 2, layout = "dwindle" },
             decoration = { rounding = (PhantomOS.rounding and PhantomOS.rounding.work) or 9, rounding_power = 2 },
         })
-        hl.animation({ leaf = "windows", enabled = true, speed = 5, curve = "phantomSoft", style = "popin 92%" })
-        hl.animation({ leaf = "layers", enabled = true, speed = 4, curve = "phantomSoft", style = "fade" })
-        hl.animation({ leaf = "workspaces", enabled = true, speed = 6, curve = "phantomSoft", style = "slidefade 18%" })
+        hl.animation({ leaf = "windows", enabled = true, speed = 5, bezier = "phantomSoft", style = "popin 92%" })
+        hl.animation({ leaf = "layers", enabled = true, speed = 4, bezier = "phantomSoft", style = "fade" })
+        hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "phantomSoft", style = "slidefade 18%" })
     end
 end
 

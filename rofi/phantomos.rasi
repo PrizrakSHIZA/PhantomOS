@@ -6,7 +6,6 @@ configuration {
     sort: true;
     sorting-method: "fzf";
     hover-select: true;
-    me-accept-entry: "MousePrimary";
 }
 
 * {

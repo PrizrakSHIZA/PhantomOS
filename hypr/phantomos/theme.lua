@@ -76,7 +76,7 @@ hl.curve("phantomSoft", {
     type = "bezier",
     points = { { 0.16, 1.0 }, { 0.3, 1.0 } },
 })
-hl.animation({ leaf = "global", enabled = true, speed = 5, curve = "phantomSoft" })
-hl.animation({ leaf = "windows", enabled = true, speed = 5, curve = "phantomSoft", style = "popin 92%" })
-hl.animation({ leaf = "layers", enabled = true, speed = 4, curve = "phantomSoft", style = "fade" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 6, curve = "phantomSoft", style = "slidefade 18%" })
+hl.animation({ leaf = "global", enabled = true, speed = 5, bezier = "phantomSoft" })
+hl.animation({ leaf = "windows", enabled = true, speed = 5, bezier = "phantomSoft", style = "popin 92%" })
+hl.animation({ leaf = "layers", enabled = true, speed = 4, bezier = "phantomSoft", style = "fade" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "phantomSoft", style = "slidefade 18%" })
