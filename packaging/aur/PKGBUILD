@@ -12,7 +12,7 @@ depends=(
   'noto-fonts' 'noto-fonts-emoji' 'papirus-icon-theme' 'pavucontrol'
   'pipewire' 'pipewire-alsa' 'pipewire-audio' 'pipewire-pulse' 'python'
   'plasma-meta' 'sddm' 'sddm-kcm' 'kdialog' 'spectacle' 'systemsettings' 'dolphin' 'konsole'
-  'grim' 'slurp' 'ttf-font-awesome' 'ttf-jetbrains-mono-nerd' 'wireplumber'
+  'grim' 'slurp' 'gtk3' 'python-gobject' 'ttf-font-awesome' 'ttf-jetbrains-mono-nerd' 'wireplumber'
   'wl-clipboard' 'xdg-desktop-portal' 'xdg-desktop-portal-kde'
 )
 makedepends=('git')

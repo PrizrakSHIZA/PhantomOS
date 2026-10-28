@@ -1,2 +1,52 @@
 #!/usr/bin/env bash
-exec systemsettings "$@"
+set -euo pipefail
+
+if ! command -v kdialog >/dev/null 2>&1; then
+    exec systemsettings "$@"
+fi
+
+open_module() {
+    local module="$1"
+    systemsettings "$module" >/dev/null 2>&1 &
+}
+
+choose_setting() {
+    kdialog --title 'PhantomOS Settings' --menu "$1" "${@:2}" 2>/dev/null
+}
+
+while true; do
+    section="$(choose_setting 'Choose a system area to configure' \
+        'display' 'Display, resolution and refresh rate' \
+        'sound' 'Sound and audio effects' \
+        'appearance' 'Colors, themes and window effects' \
+        'keyboard' 'Keyboard and language layouts' \
+        'shortcuts' 'Global keyboard shortcuts' \
+        'mouse' 'Mouse and touchpad' \
+        'network' 'Network and Bluetooth' \
+        'login' 'Login screen and automatic login' \
+        'startup' 'Startup applications' \
+        'account' 'Users and passwords' \
+        'windows' 'Window behavior and animations' \
+        'system' 'Open all KDE System Settings')" || exit 0
+
+    case "$section" in
+        display) open_module kcm_kscreen ;;
+        sound)
+            open_module kcm_pulseaudio
+            command -v easyeffects >/dev/null 2>&1 && easyeffects >/dev/null 2>&1 &
+            ;;
+        appearance)
+            item="$(choose_setting 'Appearance' 'colors' 'Colors and PhantomOS palettes' 'style' 'Application style and themes' 'effects' 'Window effects and animations')" || continue
+            case "$item" in colors) open_module kcm_colors ;; style) open_module kcm_lookandfeel ;; effects) open_module kcm_kwin_effects ;; esac
+            ;;
+        keyboard) open_module kcm_keyboard ;;
+        shortcuts) open_module kcm_keys ;;
+        mouse) open_module kcm_mouse ;;
+        network) open_module kcm_networkmanagement ;;
+        login) open_module kcm_sddm ;;
+        startup) open_module kcm_autostart ;;
+        account) open_module kcm_users ;;
+        windows) open_module kcm_kwin_effects ;;
+        system) systemsettings >/dev/null 2>&1 & ;;
+    esac
+done

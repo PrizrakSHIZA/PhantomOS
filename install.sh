@@ -40,8 +40,8 @@ if ((NO_PACKAGES == 0)); then
     command -v sudo >/dev/null 2>&1 || { echo 'Install sudo, then rerun ./install.sh.' >&2; exit 1; }
     packages=(
         plasma-meta plasma-workspace plasma-nm plasma-pa plasma-browser-integration sddm-kcm kdialog
-        kde-gtk-config kscreen sddm dolphin konsole spectacle ark kate
-        kitty micro python python-gobject git btop code
+        kde-gtk-config kscreen sddm dolphin konsole spectacle ark kate gtk3 python-gobject
+        kitty micro python git btop code
         audacious haruna xdg-utils
         pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber easyeffects lsp-plugins-lv2 pavucontrol
         networkmanager bluez bluez-utils blueman
