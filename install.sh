@@ -141,6 +141,7 @@ fi
 backup_and_install "$ROOT_DIR/hypr/hyprpaper.conf" "$CONFIG_HOME/hypr/hyprpaper.conf"
 backup_and_install "$ROOT_DIR/hypr/hyprlock.conf" "$CONFIG_HOME/hypr/hyprlock.conf"
 backup_and_install "$ROOT_DIR/assets/phantomos-night.png" "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png"
+backup_and_install "$ROOT_DIR/desktop-flavor" "$HOME/.local/share/phantomos/desktop-flavor"
 backup_and_install "$ROOT_DIR/applications/phantomos-settings.desktop" "$HOME/.local/share/applications/phantomos-settings.desktop"
 backup_and_install "$ROOT_DIR/applications/phantomos-power.desktop" "$HOME/.local/share/applications/phantomos-power.desktop"
 backup_and_install "$ROOT_DIR/applications/phantomos-btop.desktop" "$HOME/.local/share/applications/phantomos-btop.desktop"

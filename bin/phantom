@@ -13,8 +13,9 @@ from pathlib import Path
 
 
 REPOSITORY = "https://github.com/PrizrakSHIZA/PhantomOS.git"
-BRANCH = "main"
+BRANCHES = {"hyprland": "main", "plasma": "plasma"}
 HOME = Path.home()
+FLAVOR_FILE = HOME / ".local/share/phantomos/desktop-flavor"
 CTL = HOME / ".local/bin/phantomosctl"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -35,8 +36,9 @@ Usage: phantom <command>
   screenshot [type]    Copy screen, window, or selected region to clipboard
   help                 Show this help
 
-`phantom update` refreshes user configuration. AUR package updates are handled
-by yay; run `phantom setup` after a package upgrade to apply the new defaults.""")
+`phantom update` refreshes user configuration from the branch matching the
+installed desktop flavor. AUR package updates are handled by yay; run
+`phantom setup` after a package upgrade to apply the new defaults.""")
 
 
 def run_ctl(action: str) -> int:
@@ -47,14 +49,54 @@ def run_ctl(action: str) -> int:
     return result.returncode
 
 
+def installed_flavor() -> str:
+    try:
+        flavor = FLAVOR_FILE.read_text(encoding="utf-8").strip().lower()
+    except OSError:
+        flavor = "hyprland"
+    return flavor if flavor in BRANCHES else "hyprland"
+
+
+def update_without_gtk(branch: str) -> int:
+    """Update from a terminal when GTK 3 bindings are unavailable."""
+    checkout = Path(tempfile.mkdtemp(prefix="phantomos-update-"))
+    try:
+        print(f"Updating PhantomOS from branch {branch}...")
+        clone = subprocess.run(
+            ["git", "clone", "--depth", "1", "--branch", branch, REPOSITORY, str(checkout)],
+            text=True, timeout=180,
+        )
+        if clone.returncode:
+            return clone.returncode
+        revision = subprocess.run(
+            ["git", "-C", str(checkout), "rev-parse", "--short", "HEAD"],
+            text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        print(f"Applying PhantomOS revision {revision}...")
+        result = subprocess.run(
+            ["bash", str(checkout / "install.sh"), "--no-packages"],
+            cwd=checkout, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            print(f"PhantomOS updated to {revision}.")
+        return result.returncode
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"phantom update: {error}", file=sys.stderr)
+        return 1
+    finally:
+        shutil.rmtree(checkout, ignore_errors=True)
+
+
 def update() -> int:
+    flavor = installed_flavor()
+    branch = BRANCHES[flavor]
     try:
         import gi
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gdk, GLib, Gtk
-    except (ImportError, ValueError) as error:
-        print(f"phantom: GTK 3 is needed for the update screen: {error}", file=sys.stderr)
-        return 1
+    except (ImportError, ValueError):
+        print("GTK 3 bindings are unavailable; falling back to terminal update.")
+        return update_without_gtk(branch)
 
     class UpdateWindow(Gtk.Window):
         def __init__(self) -> None:
@@ -158,7 +200,7 @@ def update() -> int:
                 GLib.idle_add(self.set_stage, "Подключаюсь к репозиторию…", 0.08, REPOSITORY)
                 checkout = tempfile.mkdtemp(prefix="phantomos-update-")
                 clone = subprocess.run(
-                    ["git", "clone", "--depth", "1", "--branch", BRANCH, REPOSITORY, checkout],
+                    ["git", "clone", "--depth", "1", "--branch", branch, REPOSITORY, checkout],
                     text=True, capture_output=True, timeout=180,
                 )
                 if clone.returncode:
