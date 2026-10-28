@@ -39,7 +39,7 @@ For systems where the applications and desktop are already installed, use `bash 
 
 ## Current Plasma scope
 
-Polonium stores its tiling engine per virtual desktop and output. The current mode action changes the active desktop/output; synchronizing the mode across every monitor still needs a KWin integration pass. Plasma virtual desktops are shared by the display setup, so Relax mode does not yet reduce the system to one desktop per monitor. The panel profile moves existing Plasma panels and toggles their task manager widget; it does not create a missing panel on a monitor.
+Polonium stores its tiling engine per virtual desktop and output. The current mode action changes the active desktop/output; synchronizing the mode across every monitor still needs a KWin integration pass. Plasma virtual desktops are shared by the display setup, so Relax mode does not yet reduce the system to one desktop per monitor. The panel profile moves existing panels and creates one on any display that has none (Plasma 6.3+ is required for assigning a new panel to a specific display). It toggles the task manager widget between modes. If a panel was created while in Work mode, switch to Relax mode to add its task manager.
 
 ## Source layout
 
