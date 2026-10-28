@@ -22,7 +22,11 @@ case "$action" in
         fi
         ;;
     menu|start) qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.activateLauncher ;;
-    settings) systemsettings ;;
+    settings)
+        settings_app="$(dirname -- "${BASH_SOURCE[0]}")/phantomos-settings"
+        if [[ -x "$settings_app" ]]; then exec "$settings_app"; fi
+        systemsettings
+        ;;
     power)
         choice="$(kdialog --menu 'PhantomOS Power' lock 'Lock screen' sleep 'Suspend' logout 'Log out' reboot 'Restart' shutdown 'Power off' 2>/dev/null || true)"
         case "$choice" in

@@ -101,6 +101,7 @@ backup_and_install() {
 }
 
 backup_and_install "$ROOT_DIR/plasma/PhantomOS.colors" "$DATA_HOME/color-schemes/PhantomOS.colors"
+backup_and_install "$ROOT_DIR/plasma/PhantomOS-Dracula.colors" "$DATA_HOME/color-schemes/PhantomOS-Dracula.colors"
 backup_and_install "$ROOT_DIR/assets/icons/hicolor/scalable/apps/phantomos.svg" "$DATA_HOME/icons/hicolor/scalable/apps/phantomos.svg"
 if command -v kpackagetool6 >/dev/null 2>&1; then
     kpackagetool6 --type KWin/Script --upgrade "$ROOT_DIR/plasma/PhantomOSToggle" >/dev/null 2>&1 || \
@@ -114,7 +115,18 @@ if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then backup_and_install "$ROOT_DIR
 backup_and_install "$ROOT_DIR/assets/phantomos-night.png" "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png"
 backup_and_install "$ROOT_DIR/desktop-flavor" "$DATA_HOME/phantomos/desktop-flavor"
 for desktop in "$ROOT_DIR"/applications/*.desktop; do
-    backup_and_install "$desktop" "$DATA_HOME/applications/$(basename "$desktop")"
+    destination="$DATA_HOME/applications/$(basename "$desktop")"
+    if grep -Eq '@(PHANTOMOS_SETTINGS|PHANTOMOSCTL)@' "$desktop"; then
+        rendered_desktop="$(mktemp)"
+        sed \
+            -e "s|@PHANTOMOS_SETTINGS@|$HOME/.local/bin/phantomos-settings|g" \
+            -e "s|@PHANTOMOSCTL@|$HOME/.local/bin/phantomosctl|g" \
+            "$desktop" >"$rendered_desktop"
+        backup_and_install "$rendered_desktop" "$destination"
+        rm -f -- "$rendered_desktop"
+    else
+        backup_and_install "$desktop" "$destination"
+    fi
 done
 if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$DATA_HOME/applications"; fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -f "$DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true; fi
@@ -129,11 +141,18 @@ elif ! grep -Fq 'include phantomos.conf' "$CONFIG_HOME/kitty/kitty.conf"; then
 fi
 
 # KDE's native color scheme is applied without replacing the user's panel layout.
-if command -v plasma-apply-colorscheme >/dev/null 2>&1; then
-    plasma-apply-colorscheme PhantomOS || printf 'Color scheme installed; select PhantomOS in System Settings > Colors.\n'
+if [[ ! -e "$STATE_HOME/phantomos/color-scheme-initialized" ]]; then
+    if command -v plasma-apply-colorscheme >/dev/null 2>&1; then
+        if plasma-apply-colorscheme PhantomOS; then
+            : >"$STATE_HOME/phantomos/color-scheme-initialized"
+        else
+            printf 'Color scheme installed; select PhantomOS in System Settings > Colors.\n'
+        fi
+    else
+        printf 'Color scheme installed; select PhantomOS in System Settings > Colors.\n'
+    fi
 fi
 if command -v kwriteconfig6 >/dev/null 2>&1; then
-    kwriteconfig6 --file kdeglobals --group General --key ColorScheme PhantomOS
     kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Breeze
     kwriteconfig6 --file kwinrc --group Effect-Blur --key BlurEnabled true
     kwriteconfig6 --file kwinrc --group Plugins --key poloniumEnabled true
@@ -144,6 +163,20 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
     kwriteconfig6 --file kwinrc --group Desktops --key Number 5
     kwriteconfig6 --file kwinrc --group Desktops --key Rows 1
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Walk Through Windows" "none,none,Walk Through Windows"
+    for direction in Left Right Up Down; do
+        polonium_direction="$direction"
+        case "$direction" in Up) polonium_direction=Above ;; Down) polonium_direction=Below ;; esac
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "PoloniumActivate$polonium_direction" "Meta+$direction,none,Polonium: Activate $polonium_direction"
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "PoloniumPlace$polonium_direction" "Meta+Shift+$direction,none,Polonium: Place Window $polonium_direction"
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "PoloniumResize$direction" "Meta+Ctrl+$direction,none,Polonium: Resize Tile $direction"
+    done
+    kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Window Quick Tile Left" "Meta+Alt+Left,none,Quick Tile Window to the Left"
+    kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Window Quick Tile Right" "Meta+Alt+Right,none,Quick Tile Window to the Right"
+    kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Window Quick Tile Top" "Meta+Alt+Up,none,Quick Tile Window to the Top"
+    kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Window Quick Tile Bottom" "Meta+Alt+Down,none,Quick Tile Window to the Bottom"
+    for direction in Left Right Up Down; do
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "MoveZoom$direction" "none,none,Move Zoomed Area $direction"
+    done
     for desktop in 1 2 3 4 5; do
         kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Switch to Desktop $desktop" "Meta+$desktop,none,Switch to Desktop $desktop"
         kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Switch Window to Desktop $desktop" "Meta+Shift+$desktop,none,Switch Window to Desktop $desktop"

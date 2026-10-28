@@ -41,20 +41,20 @@ registerShortcut(
     "Switch between PhantomOS tiled and floating modes",
     "Meta+Tab",
     function () {
-        selectEngine(workMode ? "PoloniumSwitchKwin" : "PoloniumSwitchBTree", !workMode);
+        selectEngine(workMode ? "PoloniumSetEngineKWin" : "PoloniumSetEngineBTree", !workMode);
     }
 );
 registerShortcut(
     "PhantomOS: Work Mode",
     "Enable PhantomOS automatic tiling",
     "",
-    function () { selectEngine("PoloniumSwitchBTree", true); }
+    function () { selectEngine("PoloniumSetEngineBTree", true); }
 );
 registerShortcut(
     "PhantomOS: Relax Mode",
     "Enable PhantomOS floating windows",
     "",
-    function () { selectEngine("PoloniumSwitchKwin", false); }
+    function () { selectEngine("PoloniumSetEngineKWin", false); }
 );
 registerShortcut(
     "PhantomOS: Open Terminal",

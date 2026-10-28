@@ -1,11 +1,10 @@
 [Desktop Entry]
-Name=Настройки PhantomOS
-Name[en]=PhantomOS Settings
-Comment=Дисплеи, звук, сеть и параметры PhantomOS
-Comment[en]=Displays, audio, network and PhantomOS options
-Exec=phantomosctl settings
-TryExec=phantomosctl
-Icon=preferences-system
+Name=PhantomOS Settings
+Name[ru]=Настройки PhantomOS
+Comment=Display, sound, appearance and PhantomOS options
+Exec=@PHANTOMOS_SETTINGS@
+TryExec=@PHANTOMOS_SETTINGS@
+Icon=phantomos
 Terminal=false
 Type=Application
 Categories=Settings;DesktopSettings;

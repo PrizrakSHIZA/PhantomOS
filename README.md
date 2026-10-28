@@ -22,10 +22,11 @@ For systems where the applications and desktop are already installed, use `bash 
 
 - PhantomOS dark blue-violet KDE color scheme, plus Tokyo Night and Dracula palettes in `plasma/`.
 - Polonium Binary Tree tiling and KWin floating layouts, with Meta+Tab toggle.
+- In tiled mode Meta+Arrow switches focus, Meta+Shift+Arrow moves a window through the layout, and Meta+Ctrl+Arrow resizes tiles. Meta+Alt+Arrow quick-tiles floating windows.
 - Meta+Q opens Konsole; Meta+E opens Dolphin.
 - Ctrl+Shift switches between US and Russian keyboard layouts.
 - SDDM login theme and Plasma-aware autologin helper.
-- `phantom settings` opens a PhantomOS menu with shortcuts to display, sound/equalizer, appearance, keyboard layouts, global shortcuts, mouse, network, login, startup apps, and user settings. The individual pages are KDE modules so their controls remain fully functional.
+- `phantom settings` opens the PhantomOS Settings Center: a blue-violet dashboard with Work/Relax controls, Tokyo Night and Dracula palettes, and shortcuts to display, sound/equalizer, keyboard layouts, global shortcuts, mouse, network, login, startup apps, and user settings. The individual pages use KDE's native modules.
 - Dolphin is the file manager; Haruna is the video player and Audacious is the music player.
 - Spectacle captures directly to the clipboard: Print for all displays, Alt+Print for the active window, and Meta+Shift+S for a selected region.
 - Kitty uses Ctrl+Alt+C/V for terminal copy and paste, leaving Ctrl+Shift available for layout switching.
@@ -34,7 +35,7 @@ For systems where the applications and desktop are already installed, use `bash 
 
 `phantom help` lists available actions. `phantom update` fetches the branch matching `~/.local/share/phantomos/desktop-flavor` and applies it without reinstalling packages. The updater does not update Arch packages; use `sudo pacman -Syu` for that. `phantom setup` reapplies the current checkout's user configuration.
 
-`phantom work` and `phantom relax` select Polonium's Binary Tree or KWin engine for the current desktop/output. Meta+Tab toggles between them. Polonium retains its own per-desktop/output layout settings. KWin controls panel placement, virtual desktops, window decorations, animation, input, and display settings through KDE settings modules launched from the PhantomOS settings menu.
+`phantom work` and `phantom relax` select Polonium's Binary Tree or KWin engine for the current desktop/output. Meta+Tab toggles between them. Polonium retains its own per-desktop/output layout settings. KWin controls panel placement, virtual desktops, window decorations, animation, input, and display settings through KDE settings modules launched from the PhantomOS Settings Center.
 
 ## Current Plasma scope
 

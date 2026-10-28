@@ -29,7 +29,7 @@ Usage: phantom <command>
   mode                 Show the current desktop mode
   toggle               Switch Work / Relax mode
   work | relax         Select a desktop mode
-  settings             Open KDE System Settings
+  settings             Open PhantomOS Settings Center
   menu                 Open the Plasma application launcher
   power                Open power actions
   wallpaper            Open wallpaper settings

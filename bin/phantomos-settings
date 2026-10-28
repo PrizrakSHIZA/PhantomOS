@@ -1,52 +1,198 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env python3
+"""PhantomOS-branded settings hub for KDE Plasma."""
+import os
+import subprocess
+import sys
+from pathlib import Path
 
-if ! command -v kdialog >/dev/null 2>&1; then
-    exec systemsettings "$@"
-fi
 
-open_module() {
-    local module="$1"
-    systemsettings "$module" >/dev/null 2>&1 &
+def run(command):
+    try:
+        subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as error:
+        print(f"PhantomOS Settings: {error}", file=sys.stderr)
+
+
+try:
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gdk, Gtk
+except (ImportError, ValueError):
+    os.execvp("systemsettings", ["systemsettings"])
+
+DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+CTL = str(Path(__file__).resolve().with_name("phantomosctl"))
+
+
+CSS = b"""
+window { background: #1a1b26; color: #c0caf5; }
+headerbar { background: #1f2335; border: 0; color: #c0caf5; min-height: 58px; }
+headerbar .title { color: #c0caf5; font-weight: 700; }
+.sidebar { background: #16161e; padding: 14px 10px; }
+.nav-button { background: transparent; border: 0; border-radius: 10px; color: #a9b1d6; padding: 12px; text-align: left; }
+.nav-button:hover { background: #24283b; color: #c0caf5; }
+.nav-button:checked { background: #343b58; color: #bb9af7; }
+.page { padding: 26px 32px; }
+.page-title { color: #c0caf5; font-size: 23px; font-weight: 700; }
+.page-subtitle { color: #a9b1d6; margin-bottom: 18px; }
+.card { background: #24283b; border: 1px solid #343b58; border-radius: 14px; padding: 16px; }
+.card-title { color: #c0caf5; font-weight: 700; }
+.card-description { color: #a9b1d6; }
+button.action { background: #343b58; border: 1px solid #414868; border-radius: 9px; color: #c0caf5; padding: 8px 12px; }
+button.action:hover { background: #414868; border-color: #7aa2f7; }
+button.accent { background: #7aa2f7; border-color: #7aa2f7; color: #1a1b26; font-weight: 700; }
+button.accent:hover { background: #89b4fa; }
+label.muted { color: #a9b1d6; }
+"""
+
+
+PAGES = {
+    "home": ("PhantomOS", "Добро пожаловать в центр настроек PhantomOS", "applications-system-symbolic"),
+    "appearance": ("Внешний вид", "Цвета, темы и эффекты окон", "preferences-desktop-theme"),
+    "display": ("Дисплеи", "Мониторы, разрешение, расположение и частота обновления", "video-display"),
+    "sound": ("Звук", "Устройства вывода, громкость и эквалайзер", "audio-card"),
+    "input": ("Клавиатура и мышь", "Раскладки, сочетания клавиш, мышь и тачпад", "input-keyboard"),
+    "network": ("Сеть", "Сетевые подключения и Bluetooth", "network-workgroup"),
+    "account": ("Учётная запись", "Экран входа, автологин, пароль и автозапуск", "system-users"),
 }
 
-choose_setting() {
-    kdialog --title 'PhantomOS Settings' --menu "$1" "${@:2}" 2>/dev/null
-}
 
-while true; do
-    section="$(choose_setting 'Choose a system area to configure' \
-        'display' 'Display, resolution and refresh rate' \
-        'sound' 'Sound and audio effects' \
-        'appearance' 'Colors, themes and window effects' \
-        'keyboard' 'Keyboard and language layouts' \
-        'shortcuts' 'Global keyboard shortcuts' \
-        'mouse' 'Mouse and touchpad' \
-        'network' 'Network and Bluetooth' \
-        'login' 'Login screen and automatic login' \
-        'startup' 'Startup applications' \
-        'account' 'Users and passwords' \
-        'windows' 'Window behavior and animations' \
-        'system' 'Open all KDE System Settings')" || exit 0
+class SettingsWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="PhantomOS Settings")
+        self.set_default_size(1040, 700)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_icon_name("phantomos")
 
-    case "$section" in
-        display) open_module kcm_kscreen ;;
-        sound)
-            open_module kcm_pulseaudio
-            command -v easyeffects >/dev/null 2>&1 && easyeffects >/dev/null 2>&1 &
-            ;;
-        appearance)
-            item="$(choose_setting 'Appearance' 'colors' 'Colors and PhantomOS palettes' 'style' 'Application style and themes' 'effects' 'Window effects and animations')" || continue
-            case "$item" in colors) open_module kcm_colors ;; style) open_module kcm_lookandfeel ;; effects) open_module kcm_kwin_effects ;; esac
-            ;;
-        keyboard) open_module kcm_keyboard ;;
-        shortcuts) open_module kcm_keys ;;
-        mouse) open_module kcm_mouse ;;
-        network) open_module kcm_networkmanagement ;;
-        login) open_module kcm_sddm ;;
-        startup) open_module kcm_autostart ;;
-        account) open_module kcm_users ;;
-        windows) open_module kcm_kwin_effects ;;
-        system) systemsettings >/dev/null 2>&1 & ;;
-    esac
-done
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.add(root)
+        header = Gtk.HeaderBar(title="PHANTOMOS", show_close_button=True)
+        header.set_subtitle("Центр настроек")
+        self.set_titlebar(header)
+
+        body = Gtk.Box(spacing=0)
+        root.pack_start(body, True, True, 0)
+        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+        sidebar.set_size_request(218, -1)
+        sidebar.get_style_context().add_class("sidebar")
+        body.pack_start(sidebar, False, False, 0)
+
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=180)
+        self.stack.set_hexpand(True)
+        self.stack.set_vexpand(True)
+        body.pack_start(self.stack, True, True, 0)
+
+        self.nav_buttons = {}
+        nav = ["home", "appearance", "display", "sound", "input", "network", "account"]
+        for key in nav:
+            title, _subtitle, icon = PAGES[key]
+            button = Gtk.ToggleButton(label=title if key != "home" else "Обзор")
+            button.set_image(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU))
+            button.set_always_show_image(True)
+            button.set_relief(Gtk.ReliefStyle.NONE)
+            button.get_style_context().add_class("nav-button")
+            button.connect("clicked", self.show_page, key)
+            sidebar.pack_start(button, False, False, 0)
+            self.nav_buttons[key] = button
+
+        for key in nav:
+            self.stack.add_named(self.create_page(key), key)
+        self.show_page(None, "home")
+
+    def create_page(self, key):
+        title, subtitle, _icon = PAGES[key]
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        page.get_style_context().add_class("page")
+        heading = Gtk.Label(label=title, xalign=0)
+        heading.get_style_context().add_class("page-title")
+        page.pack_start(heading, False, False, 0)
+        subheading = Gtk.Label(label=subtitle, xalign=0)
+        subheading.get_style_context().add_class("page-subtitle")
+        page.pack_start(subheading, False, False, 0)
+
+        if key == "home":
+            self.add_card(page, "Режим рабочего стола", "Переключите режим окон для текущего экрана и рабочего стола.", [
+                ("Рабочий режим", [CTL, "work"], True),
+                ("Режим отдыха", [CTL, "relax"], False),
+            ])
+            self.add_card(page, "Быстрый доступ", "Главные параметры системы и PhantomOS.", [
+                ("Открыть настройки KDE", ["systemsettings"], False),
+                ("Открыть Пуск", [CTL, "menu"], False),
+            ])
+        elif key == "appearance":
+            self.add_card(page, "Цветовая тема", "Выберите палитру Tokyo Night или Dracula.", [
+                ("Tokyo Night", ["plasma-apply-colorscheme", str(DATA_HOME / "color-schemes/PhantomOS.colors")], True),
+                ("Dracula", ["plasma-apply-colorscheme", str(DATA_HOME / "color-schemes/PhantomOS-Dracula.colors")], False),
+            ])
+            self.add_card(page, "Настройка оформления", "Палитры, темы Plasma и анимации KWin.", [
+                ("Цвета", ["systemsettings", "kcm_colors"], False),
+                ("Темы Plasma", ["systemsettings", "kcm_lookandfeel"], False),
+                ("Эффекты и анимации окон", ["systemsettings", "kcm_kwin_effects"], False),
+            ])
+        elif key == "display":
+            self.add_card(page, "Мониторы", "Настройте раскладку экранов, разрешение и частоту обновления.", [
+                ("Открыть настройки дисплея", ["systemsettings", "kcm_kscreen"], True),
+            ])
+        elif key == "sound":
+            self.add_card(page, "Звук и эквалайзер", "Громкость, устройства и эффекты звука.", [
+                ("Устройства и громкость", ["systemsettings", "kcm_pulseaudio"], True),
+                ("EasyEffects", ["easyeffects"], False),
+            ])
+        elif key == "input":
+            self.add_card(page, "Клавиатура", "Языки, раскладки и сочетания клавиш.", [
+                ("Раскладки и переключение", ["systemsettings", "kcm_keyboard"], False),
+                ("Глобальные сочетания клавиш", ["systemsettings", "kcm_keys"], False),
+                ("Мышь и тачпад", ["systemsettings", "kcm_mouse"], False),
+            ])
+        elif key == "network":
+            self.add_card(page, "Подключения", "Управление сетью и Bluetooth.", [
+                ("Сеть", ["systemsettings", "kcm_networkmanagement"], True),
+                ("Bluetooth", ["blueman-manager"], False),
+            ])
+        elif key == "account":
+            self.add_card(page, "Вход и учётная запись", "Параметры экрана входа, пользователей и запуска.", [
+                ("Экран входа и автологин", ["systemsettings", "kcm_sddm"], False),
+                ("Пользователи и пароли", ["systemsettings", "kcm_users"], False),
+                ("Автозапуск приложений", ["systemsettings", "kcm_autostart"], False),
+            ])
+        return page
+
+    def add_card(self, page, title, description, actions):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=9)
+        card.get_style_context().add_class("card")
+        label = Gtk.Label(label=title, xalign=0)
+        label.get_style_context().add_class("card-title")
+        card.pack_start(label, False, False, 0)
+        detail = Gtk.Label(label=description, xalign=0, wrap=True)
+        detail.get_style_context().add_class("card-description")
+        card.pack_start(detail, False, False, 0)
+        row = Gtk.FlowBox(orientation=Gtk.Orientation.HORIZONTAL, selection_mode=Gtk.SelectionMode.NONE)
+        row.set_column_spacing(8)
+        row.set_row_spacing(8)
+        for text, command, accent in actions:
+            button = Gtk.Button(label=text)
+            button.get_style_context().add_class("action")
+            if accent:
+                button.get_style_context().add_class("accent")
+            button.connect("clicked", lambda _button, cmd=command: run(cmd))
+            row.add(button)
+        card.pack_start(row, False, False, 0)
+        page.pack_start(card, False, False, 0)
+
+    def show_page(self, button, key):
+        self.stack.set_visible_child_name(key)
+        for item, nav_button in self.nav_buttons.items():
+            nav_button.set_active(item == key)
+
+
+if __name__ == "__main__":
+    window = SettingsWindow()
+    window.connect("destroy", Gtk.main_quit)
+    window.show_all()
+    Gtk.main()
