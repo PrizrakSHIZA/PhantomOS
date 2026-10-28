@@ -3,16 +3,16 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
-BACKUP_ROOT="$HOME/.local/share/phantomos/backups"
-MANAGED_MARK="$CONFIG_HOME/hypr/.phantomos-managed"
+BACKUP_ROOT="$DATA_HOME/phantomos/backups"
 NO_PACKAGES=0
 
 usage() {
     cat <<'EOF'
-PhantomOS Arch post-install setup
+PhantomOS Plasma setup for Arch Linux
 Usage: ./install.sh [--no-packages]
-  --no-packages  Skip pacman and only install user configuration.
+  --no-packages  Skip pacman/AUR packages; install user configuration only.
   -h, --help     Show this help.
 EOF
 }
@@ -27,10 +27,10 @@ while (($#)); do
 done
 
 if [[ $EUID -eq 0 ]]; then
-    printf 'Run this script as your regular user; it calls sudo for pacman.\n' >&2
+    printf 'Run as your regular user; the installer calls sudo when needed.\n' >&2
     exit 1
 fi
-if [[ ! -f "$ROOT_DIR/hypr/hyprland.lua" || ! -f "$ROOT_DIR/bin/phantomosctl" ]]; then
+if [[ ! -f "$ROOT_DIR/bin/phantom" || ! -f "$ROOT_DIR/desktop-flavor" ]]; then
     printf 'Run install.sh from the PhantomOS project directory.\n' >&2
     exit 1
 fi
@@ -38,19 +38,30 @@ fi
 if ((NO_PACKAGES == 0)); then
     command -v pacman >/dev/null 2>&1 || { echo 'This installer expects Arch Linux and pacman.' >&2; exit 1; }
     command -v sudo >/dev/null 2>&1 || { echo 'Install sudo, then rerun ./install.sh.' >&2; exit 1; }
-
     packages=(
-        hyprland waybar rofi-wayland kitty micro python code gtk3 python-gobject git btop audacious haruna xdg-utils sddm
-        hyprpaper hyprlock swaync polkit-gnome pavucontrol easyeffects lsp-plugins-lv2
-        nwg-displays nwg-look qt6ct kvantum zenity adw-gtk-theme pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber
-        networkmanager network-manager-applet bluez bluez-utils blueman nemo gvfs gvfs-mtp tumbler ffmpegthumbnailer file-roller
-        xdg-desktop-portal xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
-        grim slurp wl-clipboard
-        papirus-icon-theme ttf-jetbrains-mono-nerd ttf-font-awesome
-        noto-fonts noto-fonts-emoji
+        plasma-meta plasma-workspace plasma-nm plasma-pa plasma-browser-integration sddm-kcm kdialog
+        kde-gtk-config kscreen sddm dolphin konsole spectacle ark kate
+        kitty micro python python-gobject git btop code
+        audacious haruna xdg-utils
+        pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber easyeffects lsp-plugins-lv2 pavucontrol
+        networkmanager bluez bluez-utils blueman
+        xdg-desktop-portal xdg-desktop-portal-kde xdg-desktop-portal-gtk
+        grim slurp wl-clipboard imagemagick
+        papirus-icon-theme ttf-jetbrains-mono-nerd ttf-font-awesome noto-fonts noto-fonts-emoji
+        adw-gtk-theme breeze-gtk desktop-file-utils
     )
-    printf 'Installing packages. NVIDIA drivers and bootloader settings are left untouched.\n'
+    printf 'Installing the Plasma desktop and PhantomOS applications. NVIDIA drivers and bootloader settings are left untouched.\n'
     sudo pacman -S --needed "${packages[@]}"
+
+    # Polonium is an AUR KWin script. Install it only through the user's existing AUR helper.
+    if command -v yay >/dev/null 2>&1; then
+        yay -S --needed kwin-polonium || {
+            printf 'Polonium was not installed. Install kwin-polonium from the AUR to enable automatic tiling.\n' >&2
+        }
+    else
+        printf 'Automatic tiling requires kwin-polonium (AUR). Install it with your AUR helper, for example: yay -S kwin-polonium\n'
+    fi
+
     sudo install -D -o root -g root -m 0755 "$ROOT_DIR/bin/phantomos-sddm-autologin" /usr/lib/phantomos/phantomos-sddm-autologin
     sudo install -D -o root -g root -m 0644 "$ROOT_DIR/assets/sddm/phantomos/Main.qml" /usr/share/sddm/themes/phantomos/Main.qml
     sudo install -D -o root -g root -m 0644 "$ROOT_DIR/assets/sddm/phantomos/metadata.desktop" /usr/share/sddm/themes/phantomos/metadata.desktop
@@ -60,119 +71,89 @@ if ((NO_PACKAGES == 0)); then
         if ! systemctl is-enabled --quiet display-manager.service; then
             sudo systemctl enable sddm.service
         else
-            printf 'An existing display manager is already enabled; leaving it unchanged. SDDM is installed but not selected as the login manager.\n'
+            printf 'An existing display manager is enabled; SDDM is installed but not selected.\n'
         fi
-        if ! systemctl is-active --quiet bluetooth.service; then
-            sudo systemctl enable --now bluetooth.service
-        fi
-
+        if ! systemctl is-active --quiet bluetooth.service; then sudo systemctl enable --now bluetooth.service; fi
         if ! systemctl is-active --quiet NetworkManager.service; then
-            existing_network_manager=0
+            active_network=0
             for service in systemd-networkd.service iwd.service dhcpcd.service; do
-                if systemctl is-active --quiet "$service" || systemctl is-enabled --quiet "$service"; then
-                    existing_network_manager=1
-                    break
-                fi
+                if systemctl is-active --quiet "$service" || systemctl is-enabled --quiet "$service"; then active_network=1; break; fi
             done
-            if ((existing_network_manager == 0)); then
-                sudo systemctl enable --now NetworkManager.service
-            else
-                printf 'Keeping the existing network service; NetworkManager was not enabled.\n'
-            fi
+            if ((active_network == 0)); then sudo systemctl enable --now NetworkManager.service; fi
         fi
     fi
 fi
 
-version_output="$(hyprland --version 2>/dev/null | head -n 1 || true)"
-version_number="$(sed -nE 's/.* ([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 \2 \3/p' <<<"$version_output")"
-if [[ -z "$version_number" ]]; then
-    printf 'Could not read the Hyprland version. Install/update Hyprland, then rerun.\n' >&2
-    exit 1
-fi
-read -r version_major version_minor version_patch <<<"$version_number"
-if ((version_major == 0 && version_minor < 55)); then
-    printf 'PhantomOS needs Hyprland 0.55+ for Lua configuration; found %s.\n' "$version_output" >&2
-    printf 'Update Arch fully, then rerun ./install.sh.\n' >&2
-    exit 1
-fi
-
-mkdir -p "$CONFIG_HOME/hypr" "$CONFIG_HOME/waybar" "$CONFIG_HOME/rofi" "$CONFIG_HOME/kitty" "$CONFIG_HOME/gtk-3.0"
-mkdir -p "$HOME/.local/share/applications"
-mkdir -p "$HOME/.local/bin" "$HOME/.local/share/phantomos/wallpapers" "$STATE_HOME/phantomos"
-
+mkdir -p "$CONFIG_HOME" "$CONFIG_HOME/kitty" "$DATA_HOME/color-schemes" "$DATA_HOME/applications" \
+    "$DATA_HOME/icons/hicolor/scalable/apps" \
+    "$HOME/.local/bin" "$HOME/.local/share/phantomos/wallpapers" "$STATE_HOME/phantomos"
 timestamp="$(date +%Y%m%d-%H%M%S)"
-if [[ ! -e "$MANAGED_MARK" ]] && { [[ -e "$CONFIG_HOME/hypr/hyprland.lua" ]] || [[ -e "$CONFIG_HOME/hypr/hyprland.conf" ]]; }; then
-    backup_dir="$BACKUP_ROOT/$timestamp"
-    mkdir -p "$backup_dir/hypr"
-    cp -a "$CONFIG_HOME/hypr/." "$backup_dir/hypr/"
-    printf 'Backed up existing Hyprland configuration to %s\n' "$backup_dir/hypr"
-fi
-
 backup_and_install() {
-    local source_file="$1"
-    local target_file="$2"
-    mkdir -p "$(dirname -- "$target_file")"
-    if [[ -e "$target_file" ]] && ! cmp -s -- "$source_file" "$target_file"; then
-        local backup_file="$BACKUP_ROOT/$timestamp${target_file#"$HOME"}"
-        mkdir -p "$(dirname -- "$backup_file")"
-        cp -a -- "$target_file" "$backup_file"
-        printf 'Backed up %s to %s\n' "$target_file" "$backup_file"
+    local src="$1" dst="$2"
+    mkdir -p "$(dirname -- "$dst")"
+    if [[ -e "$dst" ]] && ! cmp -s -- "$src" "$dst"; then
+        local backup="$BACKUP_ROOT/$timestamp${dst#"$HOME"}"
+        mkdir -p "$(dirname -- "$backup")"
+        cp -a -- "$dst" "$backup"
+        printf 'Backed up %s -> %s\n' "$dst" "$backup"
     fi
-    install -m 0644 -- "$source_file" "$target_file"
+    install -m 0644 -- "$src" "$dst"
 }
 
-backup_and_install "$ROOT_DIR/hypr/hyprland.lua" "$CONFIG_HOME/hypr/hyprland.lua"
-mkdir -p "$CONFIG_HOME/hypr/phantomos"
-while IFS= read -r -d '' source_file; do
-    relative_file="${source_file#"$ROOT_DIR/hypr/phantomos/"}"
-    backup_and_install "$source_file" "$CONFIG_HOME/hypr/phantomos/$relative_file"
-done < <(find "$ROOT_DIR/hypr/phantomos" -type f -print0)
-touch "$MANAGED_MARK"
-
-backup_and_install "$ROOT_DIR/gtk/settings.ini" "$CONFIG_HOME/gtk-3.0/settings.ini"
-backup_and_install "$ROOT_DIR/waybar/style.css" "$CONFIG_HOME/waybar/phantomos.css"
-backup_and_install "$ROOT_DIR/rofi/phantomos.rasi" "$CONFIG_HOME/rofi/phantomos.rasi"
+backup_and_install "$ROOT_DIR/plasma/PhantomOS.colors" "$DATA_HOME/color-schemes/PhantomOS.colors"
+backup_and_install "$ROOT_DIR/assets/icons/hicolor/scalable/apps/phantomos.svg" "$DATA_HOME/icons/hicolor/scalable/apps/phantomos.svg"
+if command -v kpackagetool6 >/dev/null 2>&1; then
+    kpackagetool6 --type KWin/Script --upgrade "$ROOT_DIR/plasma/PhantomOSToggle" >/dev/null 2>&1 || \
+        kpackagetool6 --type KWin/Script --install "$ROOT_DIR/plasma/PhantomOSToggle"
+fi
 backup_and_install "$ROOT_DIR/kitty/kitty.conf" "$CONFIG_HOME/kitty/phantomos.conf"
 backup_and_install "$ROOT_DIR/bin/phantomosctl" "$HOME/.local/bin/phantomosctl"
 backup_and_install "$ROOT_DIR/bin/phantomos-settings" "$HOME/.local/bin/phantomos-settings"
-if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then
-    backup_and_install "$ROOT_DIR/bin/phantom" "$HOME/.local/bin/phantom"
-fi
-backup_and_install "$ROOT_DIR/hypr/hyprpaper.conf" "$CONFIG_HOME/hypr/hyprpaper.conf"
-backup_and_install "$ROOT_DIR/hypr/hyprlock.conf" "$CONFIG_HOME/hypr/hyprlock.conf"
+backup_and_install "$ROOT_DIR/autostart/phantomos-work-mode.desktop" "$CONFIG_HOME/autostart/phantomos-work-mode.desktop"
+if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then backup_and_install "$ROOT_DIR/bin/phantom" "$HOME/.local/bin/phantom"; fi
 backup_and_install "$ROOT_DIR/assets/phantomos-night.png" "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png"
-backup_and_install "$ROOT_DIR/desktop-flavor" "$HOME/.local/share/phantomos/desktop-flavor"
-backup_and_install "$ROOT_DIR/applications/phantomos-settings.desktop" "$HOME/.local/share/applications/phantomos-settings.desktop"
-backup_and_install "$ROOT_DIR/applications/phantomos-power.desktop" "$HOME/.local/share/applications/phantomos-power.desktop"
-backup_and_install "$ROOT_DIR/applications/phantomos-btop.desktop" "$HOME/.local/share/applications/phantomos-btop.desktop"
-chmod 0755 "$HOME/.local/bin/phantomosctl"
-chmod 0755 "$HOME/.local/bin/phantomos-settings"
-if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then
-    chmod 0755 "$HOME/.local/bin/phantom"
-fi
+backup_and_install "$ROOT_DIR/desktop-flavor" "$DATA_HOME/phantomos/desktop-flavor"
+for desktop in "$ROOT_DIR"/applications/*.desktop; do
+    backup_and_install "$desktop" "$DATA_HOME/applications/$(basename "$desktop")"
+done
+if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$DATA_HOME/applications"; fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -f "$DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true; fi
+chmod 0755 "$HOME/.local/bin/phantomosctl" "$HOME/.local/bin/phantomos-settings"
+if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then chmod 0755 "$HOME/.local/bin/phantom"; fi
 
 if [[ ! -e "$CONFIG_HOME/kitty/kitty.conf" ]]; then
     printf 'include phantomos.conf\n' >"$CONFIG_HOME/kitty/kitty.conf"
 elif ! grep -Fq 'include phantomos.conf' "$CONFIG_HOME/kitty/kitty.conf"; then
-    kitty_backup="$BACKUP_ROOT/$timestamp/kitty/kitty.conf"
-    mkdir -p "$(dirname -- "$kitty_backup")"
-    cp -a "$CONFIG_HOME/kitty/kitty.conf" "$kitty_backup"
+    cp -a "$CONFIG_HOME/kitty/kitty.conf" "$BACKUP_ROOT/$timestamp/kitty.conf"
     printf '\n# PhantomOS theme\ninclude phantomos.conf\n' >>"$CONFIG_HOME/kitty/kitty.conf"
 fi
-if [[ ! -e "$STATE_HOME/phantomos/mode" ]]; then
-    printf 'work\n' >"$STATE_HOME/phantomos/mode"
+
+# KDE's native color scheme is applied without replacing the user's panel layout.
+if command -v plasma-apply-colorscheme >/dev/null 2>&1; then
+    plasma-apply-colorscheme PhantomOS || printf 'Color scheme installed; select PhantomOS in System Settings > Colors.\n'
+fi
+if command -v kwriteconfig6 >/dev/null 2>&1; then
+    kwriteconfig6 --file kdeglobals --group General --key ColorScheme PhantomOS
+    kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Breeze
+    kwriteconfig6 --file kwinrc --group Effect-Blur --key BlurEnabled true
+    kwriteconfig6 --file kwinrc --group Plugins --key poloniumEnabled true
+    kwriteconfig6 --file kwinrc --group Script-polonium --key EngineType 0
+    kwriteconfig6 --file kwinrc --group Script-polonium --key Borders 4
+    kwriteconfig6 --file kwinrc --group Script-polonium --key TiledWindowsBelow true
+    kwriteconfig6 --file kwinrc --group Plugins --key phantomos-toggleEnabled true
+    kwriteconfig6 --file kwinrc --group Desktops --key Number 5
+    kwriteconfig6 --file kwinrc --group Desktops --key Rows 1
+    kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Walk Through Windows" "none,none,Walk Through Windows"
+    for desktop in 1 2 3 4 5; do
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Switch to Desktop $desktop" "Meta+$desktop,none,Switch to Desktop $desktop"
+        kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Switch Window to Desktop $desktop" "Meta+Shift+$desktop,none,Switch Window to Desktop $desktop"
+    done
+    kwriteconfig6 --file kxkbrc --group Layout --key Use true
+    kwriteconfig6 --file kxkbrc --group Layout --key LayoutList "us,ru"
+    kwriteconfig6 --file kxkbrc --group Layout --key Options grp:ctrl_shift_toggle
 fi
 
-printf '\nPhantomOS is installed. Restart Hyprland and use Super+Tab to switch modes.\n'
+if [[ ! -e "$STATE_HOME/phantomos/mode" ]]; then printf 'work\n' >"$STATE_HOME/phantomos/mode"; fi
+printf '\nPhantomOS Plasma setup is installed. Log out and select Plasma (Wayland) at SDDM.\n'
+printf 'Use Super+Tab to switch PhantomOS modes. Settings are available in System Settings and the PhantomOS launcher.\n'
 printf 'Project: %s\nBackups: %s\n' "$ROOT_DIR" "$BACKUP_ROOT"
-
-# Set reliable per-user defaults; users can still choose another app with Open With.
-if command -v xdg-mime >/dev/null 2>&1; then
-    xdg-mime default nemo.desktop inode/directory || true
-    for mime in video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo video/mpeg; do
-        xdg-mime default org.kde.haruna.desktop "$mime" || true
-    done
-    for mime in audio/mpeg audio/flac audio/ogg audio/opus audio/wav audio/x-wav audio/aac audio/x-m4a; do
-        xdg-mime default audacious.desktop "$mime" || true
-    done
-fi

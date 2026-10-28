@@ -1,39 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-fail() { printf '%s\n' "$1" >&2; exit 1; }
-[[ $EUID -eq 0 ]] || fail 'This helper must be run through pkexec.'
-[[ ${PKEXEC_UID:-} =~ ^[1-9][0-9]*$ ]] || fail 'Could not identify the requesting user.'
-[[ $# -eq 1 && ( $1 == enable || $1 == disable ) ]] || fail 'Usage: phantomos-sddm-autologin {enable|disable}'
-
-user_record="$(getent passwd "$PKEXEC_UID")" || fail 'The requesting user account was not found.'
+[[ $EUID -eq 0 ]] || { echo 'Run this helper through pkexec.' >&2; exit 1; }
+[[ ${PKEXEC_UID:-} =~ ^[1-9][0-9]*$ ]] || { echo 'Could not identify the requesting user.' >&2; exit 1; }
+[[ $# -eq 1 && ( $1 == enable || $1 == disable ) ]] || { echo 'Usage: phantomos-sddm-autologin {enable|disable}' >&2; exit 1; }
+user_record="$(getent passwd "$PKEXEC_UID")" || { echo 'The requesting user account was not found.' >&2; exit 1; }
 username="${user_record%%:*}"
-[[ "$username" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*\$?$ ]] || fail 'The username contains characters unsupported by the SDDM configuration.'
-
+[[ "$username" =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*\$?$ ]] || { echo 'Unsupported username.' >&2; exit 1; }
 config_dir=/etc/sddm.conf.d
 config_file="$config_dir/90-phantomos-autologin.conf"
 install -d -o root -g root -m 0755 "$config_dir"
-
-if [[ $1 == disable ]]; then
-    if [[ -f "$config_file" ]]; then
-        rm -f -- "$config_file"
-    fi
-    exit 0
-fi
-
+if [[ $1 == disable ]]; then rm -f -- "$config_file"; exit 0; fi
 session_file=''
 for sessions_dir in /usr/share/wayland-sessions /usr/share/xsessions; do
     [[ -d "$sessions_dir" ]] || continue
-    while IFS= read -r candidate; do
-        session_name="${candidate##*/}"
-        if [[ "${session_name,,}" == hyprland.desktop ]]; then
-            session_file="${candidate##*/}"
-            break 2
-        fi
-    done < <(find "$sessions_dir" -maxdepth 1 -type f -name '*.desktop' -print | sort)
+    for name in plasma.desktop plasmawayland.desktop; do
+        if [[ -f "$sessions_dir/$name" ]]; then session_file="$name"; break 2; fi
+    done
 done
-[[ -n "$session_file" ]] || fail 'The Hyprland session file was not found. Install Hyprland and rerun PhantomOS setup.'
-
+[[ -n "$session_file" ]] || { echo 'The Plasma session file was not found. Install Plasma and rerun PhantomOS setup.' >&2; exit 1; }
 temporary_file="$(mktemp "$config_dir/.90-phantomos-autologin.XXXXXX")"
 trap 'rm -f -- "$temporary_file"' EXIT
 printf '[Autologin]\nUser=%s\nSession=%s\nRelogin=false\n' "$username" "$session_file" >"$temporary_file"

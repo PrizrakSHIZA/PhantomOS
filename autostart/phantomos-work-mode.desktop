@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Work Mode
+Comment=Initialize the PhantomOS tiled profile after Plasma starts
+Exec=phantomosctl work
+X-KDE-autostart-phase=2
+X-KDE-StartupNotify=false

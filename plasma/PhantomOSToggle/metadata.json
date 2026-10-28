@@ -1,0 +1,12 @@
+{
+  "KPlugin": {
+    "Authors": [{"Email": "", "Name": "PhantomOS"}],
+    "Description": "Switch PhantomOS between tiled work and floating relax layouts",
+    "Id": "phantomos-toggle",
+    "License": "MIT",
+    "Name": "PhantomOS Mode Toggle",
+    "Version": "1.0"
+  },
+  "X-Plasma-API": "javascript",
+  "KPackageStructure": "KWin/Script"
+}

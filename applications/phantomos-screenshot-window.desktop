@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Active Window Capture
+Exec=spectacle --desktopfile org.kde.spectacle.desktop --background --nonotify --copy-image --activewindow
+TryExec=spectacle
+Icon=org.kde.spectacle
+NoDisplay=true
+X-KDE-Shortcuts=Alt+Print

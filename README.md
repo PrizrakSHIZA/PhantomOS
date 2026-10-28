@@ -1,85 +1,51 @@
-# PhantomOS
+# PhantomOS Plasma
 
-Личный конфигурационный набор Arch Linux с Hyprland. PhantomOS добавляет два режима рабочего стола, единое оформление и повторяемую установку поверх уже установленного Arch.
+PhantomOS is a themed Arch Linux desktop setup built around KDE Plasma 6 on Wayland. The `plasma` branch is a separate desktop flavor; it does not install or configure Hyprland.
 
-## Режимы
+## Install
 
-**Работа** — динамический тайлинг dwindle, рабочие столы 1–5 на левом экране и 6–10 на правом, компактная верхняя панель без списка открытых окон. Super+Enter запускает Kitty, Super+1…5 переключает рабочие столы текущего монитора.
+Install Arch and Git, then run these commands as your regular user:
 
-**Отдых** — окна обоих экранов сводятся на один рабочий стол каждого монитора и становятся плавающими. На левом экране панель слева, на остальных справа; она показывает иконки приложений текущего рабочего стола. Возврат в режим работы восстанавливает прежние рабочие столы и исходное состояние плавающих окон.
+```sh
+git clone --branch plasma https://github.com/PrizrakSHIZA/PhantomOS.git
+cd PhantomOS
+bash install.sh
+```
 
-Super+Tab переключает режим. Меню приложений по Super+D содержит отдельный пункт «Настройки PhantomOS»; также он открывается по Super+I и кнопкой панели. В центре настроек есть внешний вид GTK/Qt и курсор, выбор обоев, разрешение и частота мониторов, микшер и EasyEffects с LV2-эквалайзерами, чувствительность мыши, добавление раскладок с переключением Ctrl+Shift, сеть и Bluetooth.
+The installer uses `sudo` for system packages and SDDM files. Do not run it with `sudo`. It installs Plasma, SDDM, Dolphin, Konsole, Spectacle, Kitty, micro, VS Code, btop, media players, audio tools, and networking utilities. Existing display manager selection is kept. NVIDIA drivers and boot settings are left alone. Configuration files that it replaces are backed up under `~/.local/share/phantomos/backups/`.
 
-## Оформление
+Automatic tiling uses Polonium, a KWin script available from the AUR. If `yay` is installed, the installer installs it with `yay -S --needed kwin-polonium`; otherwise install that package with your AUR helper. Polonium supports Plasma Wayland 6.4 and newer. After installation, log out, select **Plasma (Wayland)** at SDDM, and log in again so KWin loads the scripts.
 
-Tokyo Night с фиолетовыми акцентами: скруглённые панели, неброский blur, активная синяя рамка и плавные переходы. Палитру и стили можно менять в:
+For systems where the applications and desktop are already installed, use `bash install.sh --no-packages`.
 
-- waybar/style.css
-- rofi/phantomos.rasi
-- kitty/kitty.conf
-- hypr/phantomos/theme.lua
+## Included setup
 
-В репозитории есть авторские обои PhantomOS; установщик включает их в оформление рабочего стола и экрана блокировки. Дисплеи настраиваются через nwg-displays из меню настроек. Его настройки мониторов и рабочих столов подхватываются Hyprland при следующем запуске.
+- PhantomOS dark blue-violet KDE color scheme, plus Tokyo Night and Dracula palettes in `plasma/`.
+- Polonium Binary Tree tiling and KWin floating layouts, with Meta+Tab toggle.
+- Meta+Q opens Konsole; Meta+E opens Dolphin.
+- Ctrl+Shift switches between US and Russian keyboard layouts.
+- SDDM login theme and Plasma-aware autologin helper.
+- KDE System Settings provides display, refresh rate, audio, input, appearance, network, and account controls. `phantom settings` opens it.
+- Dolphin is the file manager; Haruna is the video player and Audacious is the music player.
+- Spectacle captures directly to the clipboard: Print for all displays, Alt+Print for the active window, and Meta+Shift+S for a selected region.
+- Kitty uses Ctrl+Alt+C/V for terminal copy and paste, leaving Ctrl+Shift available for layout switching.
 
-## Установка
+## Commands
 
-Требуется Arch Linux и Hyprland 0.55 или новее (Lua-конфигурация). Установщик ставит SDDM с экраном входа PhantomOS в Tokyo Night и включает SDDM, если другой дисплейный менеджер ещё не выбран. Автологин изначально выключен и настраивается в центре «Вход и безопасность». При установке с `--no-packages` системные компоненты SDDM и помощник автологина не устанавливаются; для них запусти установщик без этого параметра. NVIDIA, загрузчик и уже включённый другой дисплейный менеджер установщик не меняет. Также ставятся PipeWire/EasyEffects, графические настройки GTK/Qt и сетевые утилиты. Bluetooth включается автоматически. NetworkManager запускается только если установщик не обнаружит уже работающий или включённый сетевой сервис.
+`phantom help` lists available actions. `phantom update` fetches the branch matching `~/.local/share/phantomos/desktop-flavor` and applies it without reinstalling packages. The updater does not update Arch packages; use `sudo pacman -Syu` for that. `phantom setup` reapplies the current checkout's user configuration.
 
-    git clone https://github.com/PrizrakSHIZA/PhantomOS.git
-    cd PhantomOS
-    ./install.sh
+`phantom work` and `phantom relax` select Polonium's Binary Tree or KWin engine for the current desktop/output. Meta+Tab toggles between them. Polonium retains its own per-desktop/output layout settings. KWin controls panel placement, virtual desktops, window decorations, animation, input, and display settings through System Settings. The Plasma build currently opens native System Settings instead of a separate PhantomOS settings center.
 
-Установщик поставит пакеты через pacman, сохранит существующие настройки Hyprland и установит конфигурацию PhantomOS. Если пакеты уже установлены отдельно:
+## Current Plasma scope
 
-    ./install.sh --no-packages
+Polonium stores its tiling engine per virtual desktop and output. The current mode action changes the active desktop/output; synchronizing the mode across every monitor still needs a KWin integration pass. Plasma virtual desktops are shared by the display setup, so Relax mode does not yet reduce the system to one desktop per monitor. The panel profile moves existing Plasma panels and toggles their task manager widget; it does not create a missing panel on a monitor.
 
-После установки перезагрузи компьютер: если дисплейный менеджер не был настроен ранее, появится экран входа SDDM PhantomOS. В нём выбери пользователя и введи пароль; затем откроется Hyprland. Первый запуск создаст панели для подключённых экранов. При одном мониторе будет одна панель; при двух мониторах в режиме отдыха панели разместятся по внешним краям.
+## Source layout
 
-### Резервные копии
+- `plasma/` contains the KDE color schemes and KWin mode-toggle script.
+- `bin/` contains the `phantom` command and Plasma helpers.
+- `assets/sddm/` contains the SDDM theme.
+- `install.sh` is the Arch post-install setup.
+- `packaging/aur/` is a local PKGBUILD draft for `phantomos-plasma-git`.
 
-Перед заменой существующего Hyprland-конфига установщик копирует его в ~/.local/share/phantomos/backups/ДАТА-ВРЕМЯ/. Настройки Waybar, Rofi и Kitty также сохраняются отдельно перед заменой.
-
-## Управление
-
-- Super+Tab — переключить Работа / Отдых.
-- Super+D — меню приложений.
-- Super+I — меню настроек PhantomOS.
-- Super+Enter — терминал.
-- Super+1…5 — рабочий стол на текущем мониторе; в режиме отдыха остаётся один.
-- Super+Shift+1…5 — переместить окно на рабочий стол в режиме работы.
-- Super+H/J/K/L — фокус окна; Super+Shift+H/J/K/L — переместить окно.
-- Super+V — переключить плавающий режим активного окна.
-- Print — область экрана; Super+Print — весь экран.
-
-### Команда phantom
-
-`phantom` управляет основными действиями PhantomOS из терминала. `phantom help` выводит полный список:
-
-- `phantom update` скачивает последнюю конфигурацию из Git-репозитория во временную папку, применяет её через `install.sh --no-packages`, затем удаляет временные файлы. Перед заменой файлов установщик сохраняет резервные копии.
-- `phantom setup` применяет конфигурацию, установленную AUR-пакетом.
-- `phantom mode` показывает режим; `phantom toggle`, `phantom work` и `phantom relax` переключают его.
-- `phantom settings`, `phantom menu`, `phantom power` и `phantom wallpaper` открывают соответствующие интерфейсы. В настройках «Вход и безопасность» можно сменить пароль через `passwd` и включить или выключить автологин SDDM с подтверждением администратора.
-
-Обновление конфигурации не запускает полное обновление Arch и не меняет системные пакеты. Для обновления AUR-пакета используй `yay -Syu phantomos-git`, затем `phantom setup`.
-
-### AUR-пакет
-
-Черновик AUR находится в `packaging/aur`. До публикации его можно собрать локально через `makepkg -si` из этой папки. После публикации команда будет `yay -S phantomos-git`; затем запусти `phantom setup` от своего пользователя. Пакет установит `btop` и добавит его ярлык в меню приложений. Выбор лицензии проекта нужен до публикации PKGBUILD в AUR.
-
-Установщик ставит Kitty, micro, Python и VS Code (пакет code) вместе с основным окружением. Для файлов используется Nemo с раздельными панелями, миниатюрами, корзиной и подключением съёмных дисков; видео по умолчанию открывает Haruna, музыка — Audacious. Audacious включает встроенный эквалайзер и плагины спектральной визуализации; спектр можно закрепить в окне плеера через меню «Вид → Визуализация». MIME-типы по умолчанию назначаются во время установки, а приложения при необходимости можно сменить через «Открыть с помощью». Для звука устанавливаются PipeWire, pavucontrol и EasyEffects; дополнительные LV2-плагины дают эквалайзеры и эффекты. Системное переключение раскладки назначено на Ctrl+Shift. В Kitty копирование и вставка переназначены на Ctrl+Alt+C/V, поэтому сочетание переключения языка не конфликтует с терминалом. Звук доступен в pavucontrol. Сеть и Bluetooth откроются из меню настроек, если соответствующие утилиты уже есть в системе. Глубокие настройки Hyprland доступны через конфигурацию в ~/.config/hypr/phantomos/.
-
-## Структура
-
-- hypr/ — точка входа и Lua-модули Hyprland.
-- bin/phantomosctl — меню, управление панелями и вывод состояния.
-- waybar/ — оформление рабочих панелей.
-- rofi/ — меню приложений и быстрые действия.
-- kitty/ — Tokyo Night конфигурация терминала.
-- assets/ — генератор и PNG-обои PhantomOS.
-- install.sh — post-install установщик Arch.
-
-## NVIDIA и проверка на устройстве
-
-Твой Hyprland уже запускался на RTX 4060, поэтому установщик не меняет драйвер. После применения PhantomOS на целевой системе отдельно проверь переключение режима с обычными окнами и диалогами, сон/пробуждение, снимки экрана и игры. Wayland и NVIDIA меняются, а конфигурацию мониторов нужно сверить по именам и режимам, которые покажет hyprctl monitors.
-
-Снимки экрана копируются прямо в буфер обмена: `Print` — все экраны, `Alt+Print` — активное окно, `Super+Shift+S` — выбранная область. Команды также доступны через `phantom screenshot screen|window|region` (`region` используется по умолчанию).
+The Hyprland configuration remains in the repository for the separate `main` flavor. Do not run its installer on Plasma.

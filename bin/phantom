@@ -29,11 +29,10 @@ Usage: phantom <command>
   mode                 Show the current desktop mode
   toggle               Switch Work / Relax mode
   work | relax         Select a desktop mode
-  settings             Open PhantomOS Settings
-  menu                 Open the application menu
+  settings             Open KDE System Settings
+  menu                 Open the Plasma application launcher
   power                Open power actions
-  wallpaper            Choose a desktop wallpaper
-  screenshot [type]    Copy screen, window, or selected region to clipboard
+  wallpaper            Open wallpaper settings
   help                 Show this help
 
 `phantom update` refreshes user configuration from the branch matching the
@@ -53,8 +52,8 @@ def installed_flavor() -> str:
     try:
         flavor = FLAVOR_FILE.read_text(encoding="utf-8").strip().lower()
     except OSError:
-        flavor = "hyprland"
-    return flavor if flavor in BRANCHES else "hyprland"
+        flavor = "plasma"
+    return flavor if flavor in BRANCHES else "plasma"
 
 
 def update_without_gtk(branch: str) -> int:
@@ -263,13 +262,8 @@ def main(args: list[str]) -> int:
     if rest:
         print(f"phantom: {command} does not accept arguments", file=sys.stderr)
         return 2
-    aliases = {"mode": "show-mode", "toggle": "toggle", "work": "set-work", "relax": "set-relax"}
+    aliases = {"mode": "mode", "toggle": "toggle", "work": "work", "relax": "relax"}
     if command in aliases:
-        if command in ("work", "relax"):
-            if not shutil.which("hyprctl"):
-                print("phantom: Hyprland is not running", file=sys.stderr)
-                return 1
-            return subprocess.run(["hyprctl", "eval", f'PhantomOS.set_mode("{command}")']).returncode
         return run_ctl(aliases[command])
     if command in {"settings", "menu", "power", "wallpaper"}:
         return run_ctl(command)

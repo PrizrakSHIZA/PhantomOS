@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Full Screen Capture
+Exec=spectacle --desktopfile org.kde.spectacle.desktop --background --nonotify --copy-image --fullscreen
+TryExec=spectacle
+Icon=org.kde.spectacle
+NoDisplay=true
+X-KDE-Shortcuts=Print

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Region Capture
+Exec=spectacle --desktopfile org.kde.spectacle.desktop --background --nonotify --copy-image --region
+TryExec=spectacle
+Icon=org.kde.spectacle
+NoDisplay=true
+X-KDE-Shortcuts=Meta+Shift+S

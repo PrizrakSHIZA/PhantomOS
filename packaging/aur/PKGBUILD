@@ -1,74 +1,24 @@
 # Maintainer: PhantomOS contributors
-pkgname=phantomos-git
-pkgver=r5.20261027
+pkgname=phantomos-plasma-git
+pkgver=r1.20261028
 pkgrel=1
-pkgdesc='Tokyo Night Hyprland desktop with Work and Relax modes'
+pkgdesc='PhantomOS Plasma desktop with tiled Work and floating Relax modes'
 arch=('any')
 url='https://github.com/PrizrakSHIZA/PhantomOS'
-# TODO: choose and add a project license before publishing this PKGBUILD to AUR.
 license=('custom')
 depends=(
-  'bash'
-  'adw-gtk-theme'
-  'bluez'
-  'bluez-utils'
-  'blueman'
-  'btop'
-  'audacious'
-  'haruna'
-  'xdg-utils'
-  'code'
-  'easyeffects'
-  'git'
-  'gtk3'
-  'hyprland>=0.55'
-  'hyprlock'
-  'hyprpaper'
-  'kitty'
-  'kvantum'
-  'lsp-plugins-lv2'
-  'micro'
-  'network-manager-applet'
-  'networkmanager'
-  'noto-fonts'
-  'noto-fonts-emoji'
-  'nwg-displays'
-  'nwg-look'
-  'papirus-icon-theme'
-  'pavucontrol'
-  'pipewire'
-  'pipewire-alsa'
-  'pipewire-audio'
-  'pipewire-pulse'
-  'polkit-gnome'
-  'python'
-  'python-gobject'
-  'qt6ct'
-  'rofi-wayland'
-  'slurp'
-  'sddm'
-  'grim'
-  'swaync'
-  'nemo'
-  'gvfs'
-  'gvfs-mtp'
-  'tumbler'
-  'ffmpegthumbnailer'
-  'file-roller'
-  'ttf-font-awesome'
-  'ttf-jetbrains-mono-nerd'
-  'waybar'
-  'wireplumber'
-  'wl-clipboard'
-  'xdg-desktop-portal'
-  'xdg-desktop-portal-gtk'
-  'xdg-desktop-portal-hyprland'
-  'zenity'
+  'bash' 'bluez' 'bluez-utils' 'blueman' 'btop' 'audacious' 'haruna' 'xdg-utils'
+  'code' 'easyeffects' 'git' 'kwin-polonium' 'kitty' 'micro' 'networkmanager'
+  'noto-fonts' 'noto-fonts-emoji' 'papirus-icon-theme' 'pavucontrol'
+  'pipewire' 'pipewire-alsa' 'pipewire-audio' 'pipewire-pulse' 'python'
+  'plasma-meta' 'sddm' 'sddm-kcm' 'kdialog' 'spectacle' 'systemsettings' 'dolphin' 'konsole'
+  'grim' 'slurp' 'ttf-font-awesome' 'ttf-jetbrains-mono-nerd' 'wireplumber'
+  'wl-clipboard' 'xdg-desktop-portal' 'xdg-desktop-portal-kde'
 )
 makedepends=('git')
 provides=('phantomos')
-conflicts=('phantomos')
-source=("$pkgname::git+https://github.com/PrizrakSHIZA/PhantomOS.git#branch=main")
+conflicts=('phantomos' 'phantomos-git')
+source=("$pkgname::git+https://github.com/PrizrakSHIZA/PhantomOS.git#branch=plasma")
 sha256sums=('SKIP')
 install=phantomos.install
 
@@ -82,10 +32,9 @@ package() {
   install -d "$pkgdir/usr/share/phantomos"
   cp -a . "$pkgdir/usr/share/phantomos/"
   rm -rf "$pkgdir/usr/share/phantomos/.git" "$pkgdir/usr/share/phantomos/packaging"
-  install -Dm755 "$srcdir/$pkgname/packaging/aur/phantom-wrapper" "$pkgdir/usr/bin/phantom"
-  install -Dm644 applications/phantomos-settings.desktop "$pkgdir/usr/share/applications/phantomos-settings.desktop"
-  install -Dm644 applications/phantomos-power.desktop "$pkgdir/usr/share/applications/phantomos-power.desktop"
-  install -Dm644 applications/phantomos-btop.desktop "$pkgdir/usr/share/applications/phantomos-btop.desktop"
+  install -Dm755 packaging/aur/phantom-wrapper "$pkgdir/usr/bin/phantom"
+  install -Dm755 bin/phantomosctl "$pkgdir/usr/bin/phantomosctl"
+  install -Dm755 bin/phantomos-settings "$pkgdir/usr/bin/phantomos-settings"
   install -Dm755 bin/phantomos-sddm-autologin "$pkgdir/usr/lib/phantomos/phantomos-sddm-autologin"
   install -Dm644 assets/sddm/phantomos/Main.qml "$pkgdir/usr/share/sddm/themes/phantomos/Main.qml"
   install -Dm644 assets/sddm/phantomos/metadata.desktop "$pkgdir/usr/share/sddm/themes/phantomos/metadata.desktop"
