@@ -92,7 +92,7 @@ if command -v pacman >/dev/null 2>&1 && pacman -Qq kwin-polonium >/dev/null 2>&1
 
 mkdir -p "$CONFIG_HOME/wezterm" "$CONFIG_HOME/fish" "$CONFIG_HOME" "$DATA_HOME/color-schemes" "$DATA_HOME/applications" \
     "$DATA_HOME/icons/hicolor/scalable/apps" \
-    "$HOME/.local/bin" "$HOME/.local/share/phantomos/wallpapers" "$STATE_HOME/phantomos"
+    "$HOME/.local/bin" "$HOME/.local/share/phantomos/wallpapers" "$HOME/.local/share/phantomos/themes" "$STATE_HOME/phantomos"
 timestamp="$(date +%Y%m%d-%H%M%S)"
 backup_and_install() {
     local src="$1" dst="$2"
@@ -108,6 +108,10 @@ backup_and_install() {
 
 backup_and_install "$ROOT_DIR/plasma/PhantomOS.colors" "$DATA_HOME/color-schemes/PhantomOS.colors"
 backup_and_install "$ROOT_DIR/plasma/PhantomOS-Dracula.colors" "$DATA_HOME/color-schemes/PhantomOS-Dracula.colors"
+backup_and_install "$ROOT_DIR/plasma/PhantomOS-Emerald.colors" "$DATA_HOME/color-schemes/PhantomOS-Emerald.colors"
+backup_and_install "$ROOT_DIR/plasma/PhantomOS-Rose.colors" "$DATA_HOME/color-schemes/PhantomOS-Rose.colors"
+backup_and_install "$ROOT_DIR/plasma/PhantomOS-Gold.colors" "$DATA_HOME/color-schemes/PhantomOS-Gold.colors"
+for theme_asset in "$ROOT_DIR"/assets/themes/*.svg; do backup_and_install "$theme_asset" "$HOME/.local/share/phantomos/themes/$(basename "$theme_asset")"; done
 backup_and_install "$ROOT_DIR/assets/icons/hicolor/scalable/apps/phantomos.svg" "$DATA_HOME/icons/hicolor/scalable/apps/phantomos.svg"
 if command -v kpackagetool6 >/dev/null 2>&1; then
     kpackagetool6 --type KWin/Script --upgrade "$ROOT_DIR/plasma/PhantomOSToggle" >/dev/null 2>&1 || \
@@ -118,17 +122,21 @@ backup_and_install "$ROOT_DIR/plasma/starship.toml" "$CONFIG_HOME/starship.toml"
 backup_and_install "$ROOT_DIR/plasma/config.fish" "$CONFIG_HOME/fish/config.fish"
 backup_and_install "$ROOT_DIR/bin/phantomosctl" "$HOME/.local/bin/phantomosctl"
 backup_and_install "$ROOT_DIR/bin/phantomos-settings" "$HOME/.local/bin/phantomos-settings"
+backup_and_install "$ROOT_DIR/bin/phantomos-start" "$HOME/.local/bin/phantomos-start"
+backup_and_install "$ROOT_DIR/bin/phantomos-theme" "$HOME/.local/bin/phantomos-theme"
 backup_and_install "$ROOT_DIR/autostart/phantomos-work-mode.desktop" "$CONFIG_HOME/autostart/phantomos-work-mode.desktop"
 if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then backup_and_install "$ROOT_DIR/bin/phantom" "$HOME/.local/bin/phantom"; fi
 backup_and_install "$ROOT_DIR/assets/phantomos-night.png" "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png"
 backup_and_install "$ROOT_DIR/desktop-flavor" "$DATA_HOME/phantomos/desktop-flavor"
 for desktop in "$ROOT_DIR"/applications/*.desktop; do
     destination="$DATA_HOME/applications/$(basename "$desktop")"
-    if grep -Eq '@(PHANTOMOS_SETTINGS|PHANTOMOSCTL)@' "$desktop"; then
+    if grep -Eq '@(PHANTOMOS_SETTINGS|PHANTOMOS_START|PHANTOMOSCTL)@' "$desktop"; then
         rendered_desktop="$(mktemp)"
         sed \
             -e "s|@PHANTOMOS_SETTINGS@|$HOME/.local/bin/phantomos-settings|g" \
+            -e "s|@PHANTOMOS_START@|$HOME/.local/bin/phantomos-start|g" \
             -e "s|@PHANTOMOSCTL@|$HOME/.local/bin/phantomosctl|g" \
+            -e "s|@PHANTOMOS_THEME@|$HOME/.local/bin/phantomos-theme|g" \
             "$desktop" >"$rendered_desktop"
         backup_and_install "$rendered_desktop" "$destination"
         rm -f -- "$rendered_desktop"
@@ -138,7 +146,7 @@ for desktop in "$ROOT_DIR"/applications/*.desktop; do
 done
 if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$DATA_HOME/applications"; fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -f "$DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true; fi
-chmod 0755 "$HOME/.local/bin/phantomosctl" "$HOME/.local/bin/phantomos-settings"
+chmod 0755 "$HOME/.local/bin/phantomosctl" "$HOME/.local/bin/phantomos-settings" "$HOME/.local/bin/phantomos-start" "$HOME/.local/bin/phantomos-theme"
 if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then chmod 0755 "$HOME/.local/bin/phantom"; fi
 
 appearance_revision=2
@@ -163,6 +171,7 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
     kwriteconfig6 --file kwinrc --group Script-polonium --key TiledWindowsBelow true
     kwriteconfig6 --file kwinrc --group Plugins --key phantomos-toggleEnabled true
     kwriteconfig6 --file kwinrc --group Script-phantomos-toggle --key PoloniumAvailable "$([[ $POLONIUM_AVAILABLE == 1 ]] && printf true || printf false)"
+    kwriteconfig6 --file kwinrc --group Script-phantomos-toggle --key StartMenuUrl "$(python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$DATA_HOME/applications/phantomos-start.desktop")"
     kwriteconfig6 --file kwinrc --group Desktops --key Number 5
     kwriteconfig6 --file kwinrc --group Desktops --key Rows 1
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Walk Through Windows" "none,none,Walk Through Windows"
@@ -187,15 +196,22 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
     kwriteconfig6 --file kxkbrc --group Layout --key Use true
     kwriteconfig6 --file kxkbrc --group Layout --key LayoutList "us,ru"
     kwriteconfig6 --file kxkbrc --group Layout --key Options grp:ctrl_shift_toggle
-    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-terminal.desktop --key _launch "Meta+Return,,Open PhantomOS Terminal"
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-start.desktop --key _launch "Meta+Space,,Open PhantomOS Start"
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-terminal.desktop --key _launch "Meta+Q,Meta+Q,Open PhantomOS Terminal"
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-terminal-enter.desktop --key _launch "Meta+Return,Meta+Return,Open PhantomOS Terminal"
     kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-files.desktop --key _launch "Meta+E,,Open PhantomOS Files"
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-screenshot-screen.desktop --key _launch "Print,,Capture screens to clipboard"
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-screenshot-window.desktop --key _launch "Alt+Print,,Capture active window to clipboard"
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-screenshot-region.desktop --key _launch "Meta+Shift+S,,Select area and copy to clipboard"
 fi
 
 if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 --noincremental >/dev/null 2>&1 || true; fi
 if command -v qdbus6 >/dev/null 2>&1; then qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true; fi
 
 layout_marker="$STATE_HOME/phantomos/plasma-layout-initialized"
-if [[ ! -e "$layout_marker" || $RESET_LAYOUT == 1 ]]; then
+layout_revision=2
+current_layout="$(cat "$layout_marker" 2>/dev/null || true)"
+if [[ "$current_layout" != "$layout_revision" || $RESET_LAYOUT == 1 ]]; then
 if command -v qdbus6 >/dev/null 2>&1 && qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; then
     panel_config="$CONFIG_HOME/plasma-org.kde.plasma.desktop-appletsrc"
     if [[ -f "$panel_config" ]]; then
@@ -203,10 +219,11 @@ if command -v qdbus6 >/dev/null 2>&1 && qdbus6 org.kde.plasmashell /PlasmaShell 
         cp -a -- "$panel_config" "$BACKUP_ROOT/$timestamp$CONFIG_HOME/plasma-org.kde.plasma.desktop-appletsrc"
         printf 'Backed up your existing Plasma panels to %s\n' "$BACKUP_ROOT/$timestamp$CONFIG_HOME/plasma-org.kde.plasma.desktop-appletsrc"
     fi
-    wallpaper_uri="$(python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png")"
-    layout_script="$(sed "s|__PHANTOM_WALLPAPER_URI__|$wallpaper_uri|g" "$ROOT_DIR/plasma/apply-layout.js")"
+    wallpaper_uri="$(python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$HOME/.local/share/phantomos/themes/purple.svg")"
+    start_uri="$(python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$DATA_HOME/applications/phantomos-start.desktop")"
+    layout_script="$(sed -e "s|__PHANTOM_WALLPAPER_URI__|$wallpaper_uri|g" -e "s|__PHANTOM_START_URI__|$start_uri|g" "$ROOT_DIR/plasma/apply-layout.js")"
     qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$layout_script" >/dev/null
-    : >"$layout_marker"
+    printf '%s\n' "$layout_revision" >"$layout_marker"
     printf 'Applied PhantomOS wallpaper, Start menu, and top panel layout.\n'
 else
     printf 'Plasma shell is not running; run phantom setup from a Plasma session to apply the PhantomOS panels and wallpaper.\n'
@@ -215,6 +232,6 @@ fi
 
 if [[ ! -e "$STATE_HOME/phantomos/mode" ]]; then printf 'work\n' >"$STATE_HOME/phantomos/mode"; fi
 printf '\nPhantomOS Plasma setup is installed. Sign out and back in once to reload keyboard and global shortcuts.\n'
-printf 'Use Super+Tab to switch PhantomOS modes and Super+Enter to open WezTerm.\n'
+printf 'Use Super+Space for PhantomOS Start, Super+Tab to switch modes, and Super+Enter to open WezTerm.\n'
 if ((POLONIUM_AVAILABLE == 0)); then printf 'Automatic tiling is disabled until kwin-polonium is installed from the AUR.\n' >&2; fi
 printf 'Project: %s\nBackups: %s\n' "$ROOT_DIR" "$BACKUP_ROOT"

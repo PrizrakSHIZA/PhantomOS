@@ -1,6 +1,7 @@
 // Initial PhantomOS Plasma layout. Called by install.sh through plasmashell's
 // scripting API after the user's current panel file has been backed up.
 var phantomWallpaper = "__PHANTOM_WALLPAPER_URI__";
+var phantomStartUrl = "__PHANTOM_START_URI__";
 
 desktops().forEach(function (desktop) {
     desktop.wallpaperPlugin = "org.kde.image";
@@ -12,15 +13,6 @@ desktops().forEach(function (desktop) {
 panels().slice().forEach(function (panel) {
     panel.remove();
 });
-
-var phantomFavorites = [
-    "phantomos-settings.desktop",
-    "phantomos-work.desktop",
-    "phantomos-relax.desktop",
-    "phantomos-btop.desktop",
-    "org.kde.dolphin.desktop",
-    "phantomos-terminal.desktop",
-];
 
 for (var screen = 0; screen < screenCount; screen++) {
     var panel = new Panel;
@@ -35,10 +27,9 @@ for (var screen = 0; screen < screenCount; screen++) {
     panel.height = 36;
     panel.lengthMode = "fill";
 
-    var kickoff = panel.addWidget("org.kde.plasma.kickoff");
+    var kickoff = panel.addWidget("org.kde.plasma.icon");
     kickoff.currentConfigGroup = ["General"];
-    kickoff.writeConfig("icon", "phantomos");
-    kickoff.writeConfig("favorites", phantomFavorites);
+    kickoff.writeConfig("url", phantomStartUrl);
     kickoff.reloadConfig();
 
     panel.addWidget("org.kde.plasma.pager");

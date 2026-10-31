@@ -24,18 +24,18 @@ For systems where the applications and desktop are already installed, use `bash 
 - Polonium Binary Tree tiling and KWin floating layouts, with Meta+Tab toggle.
 - In tiled mode Meta+Arrow switches focus, Meta+Shift+Arrow moves a window through the layout, and Meta+Ctrl+Arrow resizes tiles. Meta+Alt+Arrow quick-tiles floating windows.
 - Meta+Tab toggles Work and Relax modes. Work mode places compact panels at the top without a window list. Relax mode moves each panel to the outside edge of its monitor and shows open windows there.
-- Meta+Enter opens WezTerm; Meta+E opens Dolphin.
-- The Kickoff Start menu uses the PhantomOS icon and includes PhantomOS Settings, mode actions, btop, Dolphin, and WezTerm. Papirus-Dark icons and the PhantomOS wallpaper are applied with the Tokyo Night color scheme.
+- Meta+Q (also Meta+Enter) opens WezTerm; Meta+E opens Dolphin.
+- The panel P button opens the custom PhantomOS Start menu: searchable all-apps list on the left, pinned Settings, Control Panel, btop, region scissors, Dolphin, terminal, and Themes on the right. Super+Space opens it from the keyboard. Work and Relax panels retain that same button.
 - WezTerm runs Fish with a Tokyo Night palette and Starship prompt. Starship shows the directory path; Yazi provides a multi-pane file browser in the terminal. Ctrl+Alt+C/V copies and pastes so Ctrl+Shift can switch keyboard layouts.
 - Ctrl+Shift switches between US and Russian keyboard layouts.
 - SDDM login theme and Plasma-aware autologin helper.
-- `phantom settings` opens the PhantomOS Settings Center: a blue-violet dashboard with Work/Relax controls, Tokyo Night and Dracula palettes, and shortcuts to display, sound/equalizer, keyboard layouts, global shortcuts, mouse, network, login, startup apps, and user settings. The individual pages use KDE's native modules.
+- `phantom settings` opens the PhantomOS Settings Center. Its Themes page contains only PhantomOS Violet, Emerald, Rose, and Gold palettes with matching wallpapers; the appearance page no longer links to KDE global themes. Other settings sections open the relevant KDE modules.
 - Dolphin is the file manager; Haruna is the video player and Audacious is the music player.
-- Spectacle captures directly to the clipboard: Print for all displays, Alt+Print for the active window, and Meta+Shift+S for a selected region.
+- Print captures all displays to the clipboard; Alt+Print captures the active window; Super+Shift+S opens region selection and copies it to the clipboard. Super+Q (also Super+Enter) opens WezTerm; Super+E opens Dolphin; Super+1 through 5 changes virtual desktops and Super+Shift+1 through 5 moves the active window. In Work mode Super+Arrow focuses a tile, Super+Shift+Arrow moves it, and Super+Ctrl+Arrow resizes it.
 
 ## Commands
 
-`phantom help` lists available actions. `phantom update` fetches the branch matching `~/.local/share/phantomos/desktop-flavor` and applies it without reinstalling packages. The updater does not update Arch packages; use `sudo pacman -Syu` for that. `phantom setup` reapplies the current checkout's user configuration and rebuilds the PhantomOS panels from the current Plasma session.
+`phantom help` lists available actions. `phantom update` fetches the branch matching `~/.local/share/phantomos/desktop-flavor` and applies it without reinstalling packages. The updater does not update Arch packages; use `sudo pacman -Syu` for that. `phantom setup` reapplies the current checkout's user configuration and rebuilds the PhantomOS panels from the current Plasma session. The next update migrates the previous default panel once; it backs up the current panel file first. Later updates preserve your panel arrangement.
 
 `phantom work` and `phantom relax` select Polonium's Binary Tree or KWin engine for the current desktop/output. Meta+Tab toggles between them. Polonium retains its own per-desktop/output layout settings. KWin controls panel placement, virtual desktops, window decorations, animation, input, and display settings through KDE settings modules launched from the PhantomOS Settings Center.
 

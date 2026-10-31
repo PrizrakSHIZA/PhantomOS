@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""PhantomOS two-column Start menu for Plasma."""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+try:
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gio, Gdk, Gtk
+except (ImportError, ValueError):
+    os.execvp("systemsettings", ["systemsettings"])
+
+THEMES = {"purple": ("#171522", "#211d32", "#29243d", "#a78bfa"), "green": ("#111a15", "#19261e", "#24352a", "#7ee787"), "pink": ("#211720", "#30202c", "#402a39", "#ff9fca"), "yellow": ("#201a11", "#302719", "#42351f", "#ffd166")}
+try:
+    theme_name = (Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "phantomos/theme").read_text().strip()
+except OSError:
+    theme_name = "purple"
+BG, PANEL, CARD, ACCENT = THEMES.get(theme_name, THEMES["purple"])
+TEXT = "#f3efff"
+MUTED = "#aaa3bf"
+CSS = f"""
+window#phantomos-start {{ background: {BG}; color: {TEXT}; border: 1px solid #4a4163; border-radius: 16px; }}
+.left {{ background: {PANEL}; }}
+entry {{ background: #302a46; color: {TEXT}; border: 1px solid #49405f; border-radius: 10px; padding: 10px; }}
+button {{ color: {TEXT}; background: transparent; border: 0; border-radius: 9px; padding: 9px; }}
+button:hover {{ background: {CARD}; }}
+.brand {{ color: {TEXT}; font-size: 22px; font-weight: 800; }}
+.section {{ color: {ACCENT}; font-weight: 700; }}
+.muted {{ color: {MUTED}; }}
+.pin {{ background: {CARD}; border: 1px solid #3c3552; border-radius: 12px; padding: 12px; }}
+"""
+
+
+def launch(command):
+    try:
+        subprocess.Popen(command, start_new_session=True)
+    except OSError:
+        pass
+
+
+class StartMenu(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="PhantomOS Start")
+        self.set_name("phantomos-start")
+        self.set_default_size(900, 650)
+        self.set_size_request(760, 520)
+        self.set_position(Gtk.WindowPosition.MOUSE)
+        self.set_type_hint(Gdk.WindowTypeHint.POPUP_MENU)
+        self.set_resizable(False)
+        self.set_decorated(False)
+        self.set_keep_above(True)
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS.encode())
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        outer = Gtk.Box(spacing=0)
+        self.add(outer)
+        left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        left.set_size_request(480, -1)
+        left.set_border_width(24)
+        left.get_style_context().add_class("left")
+        outer.pack_start(left, True, True, 0)
+        brand = Gtk.Label(label="PhantomOS", xalign=0)
+        brand.get_style_context().add_class("brand")
+        left.pack_start(brand, False, False, 3)
+        self.search = Gtk.SearchEntry(placeholder_text="\u041d\u0430\u0439\u0442\u0438 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435...")
+        self.search.connect("search-changed", self.filter_apps)
+        left.pack_start(self.search, False, False, 0)
+        title = Gtk.Label(label="\u0412\u0441\u0435 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f", xalign=0)
+        title.get_style_context().add_class("section")
+        left.pack_start(title, False, False, 4)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        left.pack_start(scroll, True, True, 0)
+        self.apps = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.apps.set_filter_func(self.matches)
+        scroll.add(self.apps)
+        self.app_rows = []
+        for app in sorted(Gio.AppInfo.get_all(), key=lambda item: item.get_display_name().casefold()):
+            if not app.should_show() or not app.get_executable():
+                continue
+            row = Gtk.ListBoxRow()
+            row.app_info = app
+            line = Gtk.Box(spacing=12)
+            icon = Gtk.Image.new_from_gicon(app.get_icon() or Gio.ThemedIcon.new("application-x-executable"), Gtk.IconSize.MENU)
+            line.pack_start(icon, False, False, 0)
+            line.pack_start(Gtk.Label(label=app.get_display_name(), xalign=0), True, True, 0)
+            button = Gtk.Button()
+            button.add(line)
+            button.connect("clicked", self.launch_app, app)
+            row.add(button)
+            self.apps.add(row)
+            self.app_rows.append(row)
+        right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=13)
+        right.set_size_request(370, -1)
+        right.set_border_width(24)
+        outer.pack_start(right, False, False, 0)
+        title = Gtk.Label(label="\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u0434\u043e\u0441\u0442\u0443\u043f", xalign=0)
+        title.get_style_context().add_class("section")
+        right.pack_start(title, False, False, 0)
+        settings_app = str(Path(__file__).resolve().with_name("phantomos-settings"))
+        entries = [
+            ("\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 PhantomOS", "preferences-system", [settings_app]),
+            ("\u041f\u0430\u043d\u0435\u043b\u044c \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f", "applications-system", ["systemsettings"]),
+            ("btop", "utilities-system-monitor", ["wezterm", "start", "--", "btop"]),
+            ("\u041d\u043e\u0436\u043d\u0438\u0446\u044b \u00b7 \u0432\u044b\u0434\u0435\u043b\u0438\u0442\u044c \u043e\u0431\u043b\u0430\u0441\u0442\u044c", "org.kde.spectacle", ["spectacle", "--desktopfile", "org.kde.spectacle.desktop", "--background", "--nonotify", "--copy-image", "--region"]),
+            ("\u041f\u0440\u043e\u0432\u043e\u0434\u043d\u0438\u043a", "org.kde.dolphin", ["dolphin"]),
+            ("\u0422\u0435\u0440\u043c\u0438\u043d\u0430\u043b", "utilities-terminal", ["wezterm"]),
+            ("\u0422\u0435\u043c\u044b PhantomOS", "preferences-desktop-theme", [settings_app, "--page", "appearance"]),
+        ]
+        for label, icon, command in entries:
+            button = Gtk.Button()
+            button.get_style_context().add_class("pin")
+            row = Gtk.Box(spacing=12)
+            row.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG), False, False, 0)
+            text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+            text.pack_start(Gtk.Label(label=label, xalign=0), False, False, 0)
+            button.connect("clicked", self.run_and_close, command)
+            row.pack_start(text, True, True, 0)
+            button.add(row)
+            right.pack_start(button, False, False, 0)
+        right.pack_end(Gtk.Label(label="Super+Space  \u00b7  Esc \u0437\u0430\u043a\u0440\u044b\u0442\u044c", xalign=0), False, False, 0)
+        self.connect("key-press-event", self.on_key)
+        self.connect("focus-out-event", lambda *_: self.destroy())
+        self.show_all()
+        self.search.grab_focus()
+
+    def matches(self, row):
+        query = self.search.get_text().casefold().strip()
+        app = row.app_info
+        haystack = " ".join([app.get_display_name() or "", app.get_name() or "", app.get_description() or ""]).casefold()
+        return not query or query in haystack
+
+    def filter_apps(self, *_):
+        self.apps.invalidate_filter()
+
+    def launch_app(self, _button, app):
+        try:
+            app.launch([], None)
+        finally:
+            self.destroy()
+
+    def run_and_close(self, _button, command):
+        launch(command)
+        self.destroy()
+
+    def on_key(self, _window, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.destroy()
+            return True
+        return False
+
+
+if __name__ == "__main__":
+    StartMenu()
+    Gtk.main()

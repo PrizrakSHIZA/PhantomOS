@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Start
+GenericName=Application launcher
+Comment=Open the PhantomOS application menu
+Exec=@PHANTOMOS_START@
+Icon=phantomos
+Terminal=false
+Categories=System;
+Keywords=PhantomOS;Start;Applications;
+X-KDE-Shortcuts=Meta+Space

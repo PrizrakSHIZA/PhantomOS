@@ -21,7 +21,7 @@ case "$action" in
             printf 'PhantomOS mode state is unavailable until Plasma starts.\n'
         fi
         ;;
-    menu|start) qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.activateLauncher ;;
+    menu|start) exec "$(dirname -- "${BASH_SOURCE[0]}")/phantomos-start" ;;
     settings)
         settings_app="$(dirname -- "${BASH_SOURCE[0]}")/phantomos-settings"
         if [[ -x "$settings_app" ]]; then exec "$settings_app"; fi
@@ -49,8 +49,8 @@ PhantomOS commands
   phantom toggle     Switch tiled/floating mode (Meta+Tab)
   phantom work       Select tiled mode
   phantom relax      Select floating mode
-  phantom settings   Open KDE System Settings
-  phantom menu       Open the Plasma application launcher
+  phantom settings   Open PhantomOS Settings Center
+  phantom menu       Open the PhantomOS Start menu
   phantom power      Open power actions
 HELP
         ;;

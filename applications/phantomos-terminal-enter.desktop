@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Terminal Shortcut
+Comment=Open the PhantomOS terminal
+Exec=wezterm start --always-new-process
+Icon=org.wezfurlong.wezterm
+Terminal=false
+NoDisplay=true
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-Shortcuts=Meta+Return

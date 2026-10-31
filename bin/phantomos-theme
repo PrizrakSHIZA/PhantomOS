@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+name="${1:-}"
+case "$name" in
+  purple) scheme=PhantomOS ;;
+  green) scheme=PhantomOS-Emerald ;;
+  pink) scheme=PhantomOS-Rose ;;
+  yellow) scheme=PhantomOS-Gold ;;
+  *) echo "Usage: phantomos-theme {purple|green|pink|yellow}" >&2; exit 2 ;;
+esac
+wallpaper="${XDG_DATA_HOME:-$HOME/.local/share}/phantomos/themes/$name.svg"
+[[ -r "$wallpaper" ]] || { echo "PhantomOS wallpaper missing: $wallpaper" >&2; exit 1; }
+plasma-apply-colorscheme "$scheme"
+config="${XDG_CONFIG_HOME:-$HOME/.config}/phantomos"
+mkdir -p "$config"
+printf '%s\n' "$name" >"$config/theme"
+uri="$(python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$wallpaper")"
+script="var image = \"$uri\"; desktops().forEach(function(d) { d.wallpaperPlugin = \"org.kde.image\"; d.currentConfigGroup = [\"Wallpaper\", \"org.kde.image\", \"General\"]; d.writeConfig(\"Image\", image); d.reloadConfig(); });"
+qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$script"

@@ -35,6 +35,8 @@ package() {
   install -Dm755 packaging/aur/phantom-wrapper "$pkgdir/usr/bin/phantom"
   install -Dm755 bin/phantomosctl "$pkgdir/usr/bin/phantomosctl"
   install -Dm755 bin/phantomos-settings "$pkgdir/usr/bin/phantomos-settings"
+  install -Dm755 bin/phantomos-start "$pkgdir/usr/bin/phantomos-start"
+  install -Dm755 bin/phantomos-theme "$pkgdir/usr/bin/phantomos-theme"
   install -Dm755 bin/phantomos-sddm-autologin "$pkgdir/usr/lib/phantomos/phantomos-sddm-autologin"
   install -Dm644 assets/sddm/phantomos/Main.qml "$pkgdir/usr/share/sddm/themes/phantomos/Main.qml"
   install -Dm644 assets/sddm/phantomos/metadata.desktop "$pkgdir/usr/share/sddm/themes/phantomos/metadata.desktop"
