@@ -235,7 +235,7 @@ def setup() -> int:
     if not installer.is_file():
         print("phantom: packaged install.sh was not found", file=sys.stderr)
         return 1
-    return subprocess.run(["bash", str(installer), "--no-packages"], cwd=PROJECT_ROOT).returncode
+    return subprocess.run(["bash", str(installer), "--no-packages", "--reset-layout"], cwd=PROJECT_ROOT).returncode
 
 
 def main(args: list[str]) -> int:

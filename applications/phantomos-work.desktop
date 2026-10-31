@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Work Mode
+Name[ru]=Рабочий режим PhantomOS
+Comment=Enable automatic window tiling
+Exec=@PHANTOMOSCTL@ work
+Icon=preferences-desktop-activities
+Terminal=false
+Categories=System;Settings;

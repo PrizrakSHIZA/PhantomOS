@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Files
+Name[ru]=Файлы PhantomOS
+Comment=Open the file manager
+Exec=dolphin
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileManager;
+X-KDE-GlobalAccel-CommandShortcut=true

@@ -3,7 +3,7 @@ Name=btop
 Name[ru]=Системный монитор btop
 Comment=Process and resource monitor
 Comment[ru]=Монитор процессов, памяти, дисков и сети
-Exec=kitty --title=PhantomOS-btop btop
+Exec=wezterm start --always-new-process -- btop
 Icon=utilities-system-monitor
 Terminal=false
 Type=Application

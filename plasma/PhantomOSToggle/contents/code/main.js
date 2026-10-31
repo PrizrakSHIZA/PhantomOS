@@ -1,5 +1,6 @@
 // KWin scripts run inside KWin and can invoke registered global shortcuts.
 var workMode = true;
+var poloniumAvailable = readConfig("PoloniumAvailable", false);
 
 function setPanelsForMode(isWork) {
     var script = "var isWork = " + (isWork ? "true" : "false") + ";\n" +
@@ -30,6 +31,10 @@ function setPanelsForMode(isWork) {
 }
 
 function selectEngine(shortcut, nextMode) {
+    if (!poloniumAvailable) {
+        callDBus("org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "PhantomOS", 0, "dialog-warning", "PhantomOS", "Automatic tiling is unavailable. Install kwin-polonium, then run phantom setup.", [], {}, 5000);
+        return;
+    }
     callDBus(
         "org.kde.kglobalaccel",
         "/component/kwin",
@@ -61,21 +66,5 @@ registerShortcut(
     "Enable PhantomOS floating windows",
     "",
     function () { selectEngine("PoloniumSetEngineKWin", false); }
-);
-registerShortcut(
-    "PhantomOS: Open Terminal",
-    "Open Konsole",
-    "Meta+Q",
-    function () {
-        callDBus("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "StartServiceByName", "org.kde.konsole", 0);
-    }
-);
-registerShortcut(
-    "PhantomOS: Open File Manager",
-    "Open Dolphin",
-    "Meta+E",
-    function () {
-        callDBus("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "StartServiceByName", "org.kde.dolphin", 0);
-    }
 );
 

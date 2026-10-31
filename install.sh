@@ -7,12 +7,14 @@ DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 BACKUP_ROOT="$DATA_HOME/phantomos/backups"
 NO_PACKAGES=0
+RESET_LAYOUT=0
 
 usage() {
     cat <<'EOF'
 PhantomOS Plasma setup for Arch Linux
-Usage: ./install.sh [--no-packages]
+Usage: ./install.sh [--no-packages] [--reset-layout]
   --no-packages  Skip pacman/AUR packages; install user configuration only.
+  --reset-layout Rebuild the PhantomOS Plasma panels and wallpaper.
   -h, --help     Show this help.
 EOF
 }
@@ -20,6 +22,7 @@ EOF
 while (($#)); do
     case "$1" in
         --no-packages) NO_PACKAGES=1 ;;
+        --reset-layout) RESET_LAYOUT=1 ;;
         -h|--help) usage; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
     esac
@@ -40,8 +43,8 @@ if ((NO_PACKAGES == 0)); then
     command -v sudo >/dev/null 2>&1 || { echo 'Install sudo, then rerun ./install.sh.' >&2; exit 1; }
     packages=(
         plasma-meta plasma-workspace plasma-nm plasma-pa plasma-browser-integration sddm-kcm kdialog
-        kde-gtk-config kscreen sddm dolphin konsole spectacle ark kate gtk3 python-gobject
-        kitty micro python git btop code
+        kde-gtk-config kscreen sddm dolphin konsole spectacle ark kate gtk3 python-gobject qt6-tools
+        wezterm fish starship yazi micro python git btop code
         audacious haruna xdg-utils
         pipewire pipewire-audio pipewire-alsa pipewire-pulse wireplumber easyeffects lsp-plugins-lv2 pavucontrol
         networkmanager bluez bluez-utils blueman
@@ -55,11 +58,11 @@ if ((NO_PACKAGES == 0)); then
 
     # Polonium is an AUR KWin script. Install it only through the user's existing AUR helper.
     if command -v yay >/dev/null 2>&1; then
-        yay -S --needed kwin-polonium || {
-            printf 'Polonium was not installed. Install kwin-polonium from the AUR to enable automatic tiling.\n' >&2
-        }
+        yay -S --needed kwin-polonium || printf 'WARNING: Polonium installation failed; automatic tiling will stay disabled.\n' >&2
+    elif command -v paru >/dev/null 2>&1; then
+        paru -S --needed kwin-polonium || printf 'WARNING: Polonium installation failed; automatic tiling will stay disabled.\n' >&2
     else
-        printf 'Automatic tiling requires kwin-polonium (AUR). Install it with your AUR helper, for example: yay -S kwin-polonium\n'
+        printf 'WARNING: No AUR helper found. Install kwin-polonium with yay or paru to enable automatic tiling.\n' >&2
     fi
 
     sudo install -D -o root -g root -m 0755 "$ROOT_DIR/bin/phantomos-sddm-autologin" /usr/lib/phantomos/phantomos-sddm-autologin
@@ -84,7 +87,10 @@ if ((NO_PACKAGES == 0)); then
     fi
 fi
 
-mkdir -p "$CONFIG_HOME" "$CONFIG_HOME/kitty" "$DATA_HOME/color-schemes" "$DATA_HOME/applications" \
+POLONIUM_AVAILABLE=0
+if command -v pacman >/dev/null 2>&1 && pacman -Qq kwin-polonium >/dev/null 2>&1; then POLONIUM_AVAILABLE=1; fi
+
+mkdir -p "$CONFIG_HOME/wezterm" "$CONFIG_HOME/fish" "$CONFIG_HOME" "$DATA_HOME/color-schemes" "$DATA_HOME/applications" \
     "$DATA_HOME/icons/hicolor/scalable/apps" \
     "$HOME/.local/bin" "$HOME/.local/share/phantomos/wallpapers" "$STATE_HOME/phantomos"
 timestamp="$(date +%Y%m%d-%H%M%S)"
@@ -107,7 +113,9 @@ if command -v kpackagetool6 >/dev/null 2>&1; then
     kpackagetool6 --type KWin/Script --upgrade "$ROOT_DIR/plasma/PhantomOSToggle" >/dev/null 2>&1 || \
         kpackagetool6 --type KWin/Script --install "$ROOT_DIR/plasma/PhantomOSToggle"
 fi
-backup_and_install "$ROOT_DIR/kitty/kitty.conf" "$CONFIG_HOME/kitty/phantomos.conf"
+backup_and_install "$ROOT_DIR/plasma/wezterm.lua" "$CONFIG_HOME/wezterm/wezterm.lua"
+backup_and_install "$ROOT_DIR/plasma/starship.toml" "$CONFIG_HOME/starship.toml"
+backup_and_install "$ROOT_DIR/plasma/config.fish" "$CONFIG_HOME/fish/config.fish"
 backup_and_install "$ROOT_DIR/bin/phantomosctl" "$HOME/.local/bin/phantomosctl"
 backup_and_install "$ROOT_DIR/bin/phantomos-settings" "$HOME/.local/bin/phantomos-settings"
 backup_and_install "$ROOT_DIR/autostart/phantomos-work-mode.desktop" "$CONFIG_HOME/autostart/phantomos-work-mode.desktop"
@@ -133,33 +141,28 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache 
 chmod 0755 "$HOME/.local/bin/phantomosctl" "$HOME/.local/bin/phantomos-settings"
 if [[ "${PHANTOMOS_PACKAGE_MODE:-0}" != 1 ]]; then chmod 0755 "$HOME/.local/bin/phantom"; fi
 
-if [[ ! -e "$CONFIG_HOME/kitty/kitty.conf" ]]; then
-    printf 'include phantomos.conf\n' >"$CONFIG_HOME/kitty/kitty.conf"
-elif ! grep -Fq 'include phantomos.conf' "$CONFIG_HOME/kitty/kitty.conf"; then
-    cp -a "$CONFIG_HOME/kitty/kitty.conf" "$BACKUP_ROOT/$timestamp/kitty.conf"
-    printf '\n# PhantomOS theme\ninclude phantomos.conf\n' >>"$CONFIG_HOME/kitty/kitty.conf"
-fi
-
-# KDE's native color scheme is applied without replacing the user's panel layout.
-if [[ ! -e "$STATE_HOME/phantomos/color-scheme-initialized" ]]; then
-    if command -v plasma-apply-colorscheme >/dev/null 2>&1; then
-        if plasma-apply-colorscheme PhantomOS; then
-            : >"$STATE_HOME/phantomos/color-scheme-initialized"
-        else
-            printf 'Color scheme installed; select PhantomOS in System Settings > Colors.\n'
-        fi
+appearance_revision=2
+current_appearance="$(cat "$STATE_HOME/phantomos/appearance-revision" 2>/dev/null || true)"
+if [[ "$current_appearance" != "$appearance_revision" ]]; then
+    if command -v plasma-apply-colorscheme >/dev/null 2>&1 && plasma-apply-colorscheme PhantomOS; then
+        kwriteconfig6 --file kdeglobals --group Icons --key Theme Papirus-Dark 2>/dev/null || true
+        kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Breeze 2>/dev/null || true
+        printf '%s\n' "$appearance_revision" >"$STATE_HOME/phantomos/appearance-revision"
     else
-        printf 'Color scheme installed; select PhantomOS in System Settings > Colors.\n'
+        printf 'PhantomOS color scheme is installed; select it in System Settings > Colors.\n'
     fi
 fi
 if command -v kwriteconfig6 >/dev/null 2>&1; then
-    kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Breeze
-    kwriteconfig6 --file kwinrc --group Effect-Blur --key BlurEnabled true
+    kwriteconfig6 --file kdeglobals --group General --key TerminalApplication wezterm
+    kwriteconfig6 --file kdeglobals --group General --key TerminalService org.wezfurlong.wezterm.desktop
+    kwriteconfig6 --file kwinrc --group Plugins --key blurEnabled true
+    kwriteconfig6 --file kwinrc --group Effect-Blur --key BlurStrength 5
     kwriteconfig6 --file kwinrc --group Plugins --key poloniumEnabled true
     kwriteconfig6 --file kwinrc --group Script-polonium --key EngineType 0
     kwriteconfig6 --file kwinrc --group Script-polonium --key Borders 4
     kwriteconfig6 --file kwinrc --group Script-polonium --key TiledWindowsBelow true
     kwriteconfig6 --file kwinrc --group Plugins --key phantomos-toggleEnabled true
+    kwriteconfig6 --file kwinrc --group Script-phantomos-toggle --key PoloniumAvailable "$([[ $POLONIUM_AVAILABLE == 1 ]] && printf true || printf false)"
     kwriteconfig6 --file kwinrc --group Desktops --key Number 5
     kwriteconfig6 --file kwinrc --group Desktops --key Rows 1
     kwriteconfig6 --file kglobalshortcutsrc --group kwin --key "Walk Through Windows" "none,none,Walk Through Windows"
@@ -184,9 +187,34 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
     kwriteconfig6 --file kxkbrc --group Layout --key Use true
     kwriteconfig6 --file kxkbrc --group Layout --key LayoutList "us,ru"
     kwriteconfig6 --file kxkbrc --group Layout --key Options grp:ctrl_shift_toggle
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-terminal.desktop --key _launch "Meta+Return,,Open PhantomOS Terminal"
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group phantomos-files.desktop --key _launch "Meta+E,,Open PhantomOS Files"
+fi
+
+if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 --noincremental >/dev/null 2>&1 || true; fi
+if command -v qdbus6 >/dev/null 2>&1; then qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true; fi
+
+layout_marker="$STATE_HOME/phantomos/plasma-layout-initialized"
+if [[ ! -e "$layout_marker" || $RESET_LAYOUT == 1 ]]; then
+if command -v qdbus6 >/dev/null 2>&1 && qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; then
+    panel_config="$CONFIG_HOME/plasma-org.kde.plasma.desktop-appletsrc"
+    if [[ -f "$panel_config" ]]; then
+        mkdir -p "$BACKUP_ROOT/$timestamp$CONFIG_HOME"
+        cp -a -- "$panel_config" "$BACKUP_ROOT/$timestamp$CONFIG_HOME/plasma-org.kde.plasma.desktop-appletsrc"
+        printf 'Backed up your existing Plasma panels to %s\n' "$BACKUP_ROOT/$timestamp$CONFIG_HOME/plasma-org.kde.plasma.desktop-appletsrc"
+    fi
+    wallpaper_uri="$(python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$HOME/.local/share/phantomos/wallpapers/phantomos-night.png")"
+    layout_script="$(sed "s|__PHANTOM_WALLPAPER_URI__|$wallpaper_uri|g" "$ROOT_DIR/plasma/apply-layout.js")"
+    qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$layout_script" >/dev/null
+    : >"$layout_marker"
+    printf 'Applied PhantomOS wallpaper, Start menu, and top panel layout.\n'
+else
+    printf 'Plasma shell is not running; run phantom setup from a Plasma session to apply the PhantomOS panels and wallpaper.\n'
+fi
 fi
 
 if [[ ! -e "$STATE_HOME/phantomos/mode" ]]; then printf 'work\n' >"$STATE_HOME/phantomos/mode"; fi
-printf '\nPhantomOS Plasma setup is installed. Log out and select Plasma (Wayland) at SDDM.\n'
-printf 'Use Super+Tab to switch PhantomOS modes. Settings are available in System Settings and the PhantomOS launcher.\n'
+printf '\nPhantomOS Plasma setup is installed. Sign out and back in once to reload keyboard and global shortcuts.\n'
+printf 'Use Super+Tab to switch PhantomOS modes and Super+Enter to open WezTerm.\n'
+if ((POLONIUM_AVAILABLE == 0)); then printf 'Automatic tiling is disabled until kwin-polonium is installed from the AUR.\n' >&2; fi
 printf 'Project: %s\nBackups: %s\n' "$ROOT_DIR" "$BACKUP_ROOT"

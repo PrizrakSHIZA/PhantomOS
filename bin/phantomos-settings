@@ -127,8 +127,8 @@ class SettingsWindow(Gtk.Window):
             ])
         elif key == "appearance":
             self.add_card(page, "Цветовая тема", "Выберите палитру Tokyo Night или Dracula.", [
-                ("Tokyo Night", ["plasma-apply-colorscheme", str(DATA_HOME / "color-schemes/PhantomOS.colors")], True),
-                ("Dracula", ["plasma-apply-colorscheme", str(DATA_HOME / "color-schemes/PhantomOS-Dracula.colors")], False),
+                ("Tokyo Night", ["plasma-apply-colorscheme", "PhantomOS"], True),
+                ("Dracula", ["plasma-apply-colorscheme", "PhantomOS-Dracula"], False),
             ])
             self.add_card(page, "Настройка оформления", "Палитры, темы Plasma и анимации KWin.", [
                 ("Цвета", ["systemsettings", "kcm_colors"], False),

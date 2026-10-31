@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PhantomOS Relax Mode
+Name[ru]=Режим отдыха PhantomOS
+Comment=Use floating windows
+Exec=@PHANTOMOSCTL@ relax
+Icon=preferences-system-windows
+Terminal=false
+Categories=System;Settings;
