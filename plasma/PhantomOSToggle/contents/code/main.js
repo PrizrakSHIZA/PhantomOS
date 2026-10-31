@@ -1,12 +1,12 @@
 // KWin scripts run inside KWin and can invoke registered global shortcuts.
-var workMode = true;
+var workMode = readConfig("Mode", "work") !== "relax";
 var poloniumAvailable = readConfig("PoloniumAvailable", false);
 var startMenuUrl = readConfig("StartMenuUrl", "");
 
 function setPanelsForMode(isWork) {
     var script = "var isWork = " + (isWork ? "true" : "false") + ";\n" +
         "var startMenuUrl = " + JSON.stringify(readConfig("StartMenuUrl", "")) + ";\n" +
-        "var state = ConfigFile('phantomosrc'); state.group = 'PhantomOS'; state.writeEntry('Mode', isWork ? 'work' : 'relax');\n" +
+        "var state = ConfigFile('phantomosrc'); state.group = 'PhantomOS'; state.writeEntry('Mode', isWork ? 'work' : 'relax'); var scriptState = ConfigFile('kwinrc'); scriptState.group = 'Script-phantomos-toggle'; scriptState.writeEntry('Mode', isWork ? 'work' : 'relax');\n" +
         "var leftScreen = 0; var rightScreen = 0;\n" +
         "for (var i = 0; i < screenCount; i++) { var area = screenGeometry(i); if (area.x < screenGeometry(leftScreen).x) leftScreen = i; if (area.x > screenGeometry(rightScreen).x) rightScreen = i; }\n" +
         "function configurePanel(panel) {\n" +
@@ -33,22 +33,16 @@ function setPanelsForMode(isWork) {
 }
 
 function selectEngine(shortcut, nextMode) {
-    if (!poloniumAvailable) {
-        callDBus("org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "PhantomOS", 0, "dialog-warning", "PhantomOS", "Automatic tiling is unavailable. Install kwin-polonium, then run phantom setup.", [], {}, 5000);
-        return;
-    }
-    callDBus(
-        "org.kde.kglobalaccel",
-        "/component/kwin",
-        "org.kde.kglobalaccel.Component",
-        "invokeShortcut",
-        shortcut
-    );
+    // Keep the panel and mode state usable even when the tiling backend is missing.
     workMode = nextMode;
     setPanelsForMode(nextMode);
-    callDBus("org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "PhantomOS", 0, "preferences-desktop", "PhantomOS", nextMode ? "Work mode: tiled windows" : "Relax mode: floating windows", [], {}, 1800);
+    if (poloniumAvailable) {
+        callDBus("org.kde.kglobalaccel", "/component/kwin", "org.kde.kglobalaccel.Component", "invokeShortcut", shortcut);
+    } else if (nextMode) {
+        callDBus("org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "PhantomOS", 0, "dialog-warning", "PhantomOS", "Panel mode changed, but automatic tiling is unavailable. Install kwin-polonium and run phantom setup.", [], {}, 6000);
+    }
+    callDBus("org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "PhantomOS", 0, "preferences-desktop", "PhantomOS", nextMode ? "Work mode" : "Relax mode", [], {}, 1800);
 }
-
 registerShortcut(
     "PhantomOS: Toggle Work/Relax",
     "Switch between PhantomOS tiled and floating modes",

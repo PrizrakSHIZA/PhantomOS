@@ -170,6 +170,7 @@ if command -v kwriteconfig6 >/dev/null 2>&1; then
     kwriteconfig6 --file kwinrc --group Script-polonium --key Borders 4
     kwriteconfig6 --file kwinrc --group Script-polonium --key TiledWindowsBelow true
     kwriteconfig6 --file kwinrc --group Plugins --key phantomos-toggleEnabled true
+    kwriteconfig6 --file kwinrc --group Script-phantomos-toggle --key Mode work
     kwriteconfig6 --file kwinrc --group Script-phantomos-toggle --key PoloniumAvailable "$([[ $POLONIUM_AVAILABLE == 1 ]] && printf true || printf false)"
     kwriteconfig6 --file kwinrc --group Script-phantomos-toggle --key StartMenuUrl "$(python -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' "$DATA_HOME/applications/phantomos-start.desktop")"
     kwriteconfig6 --file kwinrc --group Desktops --key Number 5
@@ -209,7 +210,7 @@ if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 --noincremental 
 if command -v qdbus6 >/dev/null 2>&1; then qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true; fi
 
 layout_marker="$STATE_HOME/phantomos/plasma-layout-initialized"
-layout_revision=2
+layout_revision=3
 current_layout="$(cat "$layout_marker" 2>/dev/null || true)"
 if [[ "$current_layout" != "$layout_revision" || $RESET_LAYOUT == 1 ]]; then
 if command -v qdbus6 >/dev/null 2>&1 && qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; then

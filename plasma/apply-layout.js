@@ -35,5 +35,6 @@ for (var screen = 0; screen < screenCount; screen++) {
     panel.addWidget("org.kde.plasma.pager");
     panel.addWidget("org.kde.plasma.panelspacer");
     panel.addWidget("org.kde.plasma.systemtray");
+    panel.addWidget("org.kde.plasma.lock_logout");
     panel.addWidget("org.kde.plasma.digitalclock");
 }
