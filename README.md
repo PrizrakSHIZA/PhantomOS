@@ -1,13 +1,13 @@
 # PhantomOS Plasma
 
-PhantomOS is a themed Arch Linux desktop setup built around KDE Plasma 6 on Wayland. The `plasma` branch is a separate desktop flavor; it does not install or configure Hyprland.
+PhantomOS is a themed Arch Linux desktop setup built around KDE Plasma 6 on Wayland. PhantomOS now uses one main branch for its Plasma desktop profile. It does not install or configure Hyprland.
 
 ## Install
 
 Install Arch and Git, then run these commands as your regular user:
 
 ```sh
-git clone --branch plasma https://github.com/PrizrakSHIZA/PhantomOS.git
+git clone --branch main https://github.com/PrizrakSHIZA/PhantomOS.git
 cd PhantomOS
 bash install.sh
 ```

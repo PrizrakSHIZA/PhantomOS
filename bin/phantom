@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 REPOSITORY = "https://github.com/PrizrakSHIZA/PhantomOS.git"
-BRANCHES = {"hyprland": "main", "plasma": "plasma"}
+BRANCHES = {"hyprland": "main", "plasma": "main"}
 HOME = Path.home()
 FLAVOR_FILE = HOME / ".local/share/phantomos/desktop-flavor"
 CTL = HOME / ".local/bin/phantomosctl"
